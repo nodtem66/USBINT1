@@ -1,8 +1,13 @@
 # USBINT1
-USB firmware 
+USB firmware in #golang for ARM6 (Raspberry Pi)
 
-## Installation
-* open usbint1.workspace with [Codelite](http://codelite.org/) 
+## Directory
+* test: 
+  The collection of simple program to prove the proper protocol instruction.
+* usbint1:
+
+## Test (interrupt with libusb implemented with C)
+* open test/usbint1.workspace with [Codelite](http://codelite.org/) 
 * build and run
 
 ## Related projects
