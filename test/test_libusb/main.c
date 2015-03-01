@@ -3,6 +3,7 @@
 #include <string.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/time.h>
 #include <libusb-1.0/libusb.h>
 
 //------------------------------------------------------------------------------
@@ -12,11 +13,16 @@
 #define ID_PRODUCT		0x8846
 #define EP_INT_IN		0x83
 #define EP_PACKET_SIZE	64
+#define TRUE 1
+#define FALSE 0
 //------------------------------------------------------------------------------
 // Global variables
 //------------------------------------------------------------------------------
 static int do_exit = FALSE;
 static libusb_device_handle * LIBUSB_CALL dev_handle = NULL;
+static struct timeval tv, prev_tv;
+static time_t secTime = 0;
+static struct timezone tz;
 static int counter = 0;
 uint8_t buffer[EP_PACKET_SIZE];
 
@@ -70,8 +76,8 @@ static void scan_devices()
 //------------------------------------------------------------------------------
 static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 {
-	uint16_t i, len = 0;
-	counter++;
+	//uint16_t i, len = 0;
+	//counter++;
 	
 	if (xfr->status != LIBUSB_TRANSFER_COMPLETED) 
 	{
@@ -79,18 +85,26 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 		libusb_free_transfer(xfr);
 		exit(3);
 	}
-	
+	/*
 	printf("[%d] XFR length: %u, actual_length: %u\n",
 		counter,
 		xfr->length,
 		xfr->actual_length);
-		
+	
 	for (i=0, len=xfr->actual_length; i<len; i++)
 	{
 		printf("%02d ", xfr->buffer[i]);
 	}
-	printf("\n");
-	
+	printf("\n");*/
+	gettimeofday(&tv, &tz);
+	secTime = tv.tv_sec - prev_tv.tv_sec;
+	if (secTime > 0)
+	{
+		printf("%ld ", secTime*1000000 + tv.tv_usec - prev_tv.tv_usec);
+	} else {
+		printf("%ld ", tv.tv_usec - prev_tv.tv_usec);
+	}
+	gettimeofday(&prev_tv, &tz);
 	if (libusb_submit_transfer(xfr) < 0)
 	{
 		printf("Error re-submmit transfer\n");
@@ -168,6 +182,7 @@ int main()
 	TRY("claming interface 0", libusb_claim_interface(dev_handle, 0));
 	
 	//start test device
+	gettimeofday(&prev_tv, &tz);
 	TRY("testing", test_int(EP_INT_IN));
 	
 	while (!do_exit)
