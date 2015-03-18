@@ -3,13 +3,35 @@ package usbint
 import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
+	"github.com/nodtem66/usbint1/firmware"
+	"github.com/nodtem66/usbint1/wrapper"
+	"time"
+)
+
+type ScannerStatus int
+
+const (
+	SCANNER_WAIT ScannerStatus = iota
+	SCANNER_FOUND
+	SCANNER_CONNECTED
+)
+
+const (
+	EVENT_SCANNER_TO_CLOSE EventDataType = iota
+	EVENT_SCANNER_TO_EXIT
+	EVENT_SCANNER_TO_RETRY
+	EVENT_SCANNER_WAIT
+	EVENT_SCANNER_FOUND
+	EVENT_SCANNER_CONNECT
 )
 
 type Scanner struct {
-	context             *usb.Context
-	vendorId, productId int
-	timeoutMsec         int
-	eventChannel        chan EventMessage
+	Context             *usb.Context
+	VendorId, ProductId int
+	Status              ScannerStatus
+	EventChannel        chan EventMessage
+	Done                chan struct{}
+	Retry               chan struct{}
 }
 
 func NewScanner(vid, pid int) *Scanner {
@@ -18,63 +40,108 @@ func NewScanner(vid, pid int) *Scanner {
 	c.Debug(0)
 
 	scanner := &Scanner{
-		context:      c,
-		vendorId:     vid,
-		productId:    pid,
-		eventChannel: make(chan EventMessage, 3),
+		Context:      c,
+		VendorId:     vid,
+		ProductId:    pid,
+		EventChannel: make(chan EventMessage),
+		Status:       SCANNER_WAIT,
+		Done:         make(chan struct{}, 3),
+		Retry:        make(chan struct{}, 1),
 	}
+
+	// manage external event handler
+	go func() {
+		for msg := range scanner.EventChannel {
+			switch msg.Status {
+			case EVENT_SCANNER_TO_CLOSE:
+				fallthrough
+			case EVENT_SCANNER_TO_EXIT:
+				scanner.StopScan()
+				scanner.Close()
+			case EVENT_SCANNER_TO_RETRY:
+				scanner.Retry <- struct{}{}
+			}
+		}
+	}()
+
 	return scanner
 }
 
-func (s Scanner) StartScan() error {
-	// select all device with specific vid,pid
-	devices, err := s.context.ListDevices(func(desc *usb.Descriptor) bool {
+func (s *Scanner) StartScan(e *EventHandler) {
+	go func() {
+	start_scan_loop:
+		for {
+			// select all device with specific vid,pid
+			e.SendMessage(EVENT_MAIN, EVENT_SCANNER_WAIT)
+			devices, err := s.Context.ListDevices(func(desc *usb.Descriptor) bool {
 
-		// check if device has a selected vid, pid
-		if int(desc.Vendor) == s.vendorId && int(desc.Product) == s.productId {
-			return true
+				// check if device has a selected vid, pid
+				if int(desc.Vendor) == s.VendorId && int(desc.Product) == s.ProductId {
+					return true
+				}
+				return false
+			})
+			if err != nil && len(devices) == 0 {
+				fmt.Println(err)
+			}
+
+			// select the first device that can be initialized
+			var f firmware.Firmware
+			for i, d := range devices {
+				if i == 0 {
+					f = firmware.NewFirmware(d)
+					s.Status = SCANNER_FOUND
+					e.SendMessage(EVENT_MAIN, EVENT_SCANNER_FOUND)
+				} else {
+					d.Close()
+				}
+			}
+
+			// start firmware reader, else wait for retry
+			if f != nil {
+				fmt.Printf("Start %s\n", f)
+				firmware_running(s, f)
+				e.SendMessage(EVENT_MAIN, EVENT_SCANNER_CONNECT)
+			} else {
+				fmt.Println("wait for device")
+			}
+
+			// wait for retry
+			for {
+				select {
+				case <-time.After(time.Second * 3):
+					if s.Status == SCANNER_WAIT {
+						fmt.Println("timeout 3 second.")
+						continue start_scan_loop
+					}
+				case <-s.Retry:
+					fmt.Println("Retry!")
+					continue start_scan_loop
+				case <-s.Done:
+					return
+				}
+			}
 		}
-		return false
-	})
+	}()
+}
+func (s *Scanner) StopScan() {
+	s.Done <- struct{}{}
+	s.Done <- struct{}{}
+	s.Done <- struct{}{}
+}
+
+func (s *Scanner) Close() {
+	s.Context.Close()
+}
+
+func firmware_running(s *Scanner, f firmware.Firmware) {
+	// create wrapper from db and firmwareId
+	w := wrapper.NewWrapper(f.GetFirmwareId(), nil, s.Done)
+	// run routine usb reader
+	err := f.IOLoop(w, s.Done)
 	if err != nil {
 		fmt.Println(err)
-		return err
+		close(w)
+		s.Retry <- struct{}{}
 	}
-	for _, d := range devices {
-		d.Close()
-	}
-	return nil
-}
-
-func (s Scanner) StopScan() {
-
-}
-
-func (s Scanner) Close() {
-	s.context.Close()
-}
-
-func scan_running() {
-	for {
-		//TODO: Implement scanner
-	}
-
-	//TODO: Implement sender
-	for {
-	}
-}
-
-type Device struct {
-	*usb.Device
-	ManufacturerString string
-	ProductString      string
-}
-
-func NewDeivce(dev *usb.Device) *Device {
-	device := &Device{
-		dev,
-		"",
-		"",
-	}
-	return device
 }

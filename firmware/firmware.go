@@ -5,20 +5,39 @@ import (
 )
 
 type FirmwareId int
+type FirmwareAcceptFunc func(string, string, *usb.Descriptor) bool
+type FirmwareInitFunc func(*usb.Device) Firmware
 
 // List of all support firmware
 // Define your firmware here
 const (
-	FIRMWARE_TEMPERATURE_EP3_INT64 FirmwareId = iota
+	FIRMWARE_NO_FOUND FirmwareId = iota
+	FIRMWARE_TEMPERATURE_EP3_INT64
 )
 
-type Firmware interface {
-	Open()
-	Close()
-	IOLoop()
-	SetSender()
+var FirmwareAcceptFuncMap = map[FirmwareId]FirmwareAcceptFunc{
+	FIRMWARE_TEMPERATURE_EP3_INT64: TemperatureEP3Int64AcceptFunc,
 }
 
-func GetFirmwareId(device usb.Device) FirmwareId {
-	return 0
+var FirmwareInitFuncMap = map[FirmwareId]FirmwareInitFunc{
+	FIRMWARE_TEMPERATURE_EP3_INT64: TemperatureEP3Int64InitFunc,
+}
+
+type Firmware interface {
+	IOLoop(chan []byte, chan struct{}) error
+	GetFirmwareId() FirmwareId
+}
+
+func NewFirmware(dev *usb.Device) Firmware {
+
+	vendor, _ := dev.GetStringDescriptor(1)
+	product, _ := dev.GetStringDescriptor(2)
+	desc := dev.Descriptor
+
+	for id, accept := range FirmwareAcceptFuncMap {
+		if accept(vendor, product, desc) {
+			return FirmwareInitFuncMap[id](dev)
+		}
+	}
+	return nil
 }

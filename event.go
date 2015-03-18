@@ -1,24 +1,26 @@
 package usbint
 
+type EventDataType int
+type EventName int
+
 const (
-	EVENT_ALL int = iota
+	EVENT_ALL EventName = iota
+	EVENT_MAIN
 	EVENT_SCANNER
 	EVENT_IOLOOP
 	EVENT_SENDER
 	EVENT_DATABASE
 )
 
-type EventDataType int
-
 // EventMessage structure of message in Event channel pipe
 type EventMessage struct {
-	name   int
-	status EventDataType
+	Name   EventName
+	Status EventDataType
 }
 
 // EventHandler centralizes the in-event and distributes out-event
 type EventHandler struct {
-	subcribed_service map[int]EventSubscriptor
+	subcribed_service map[EventName]EventSubscriptor
 	input_pipe        chan EventMessage
 	done              chan struct{}
 }
@@ -29,7 +31,7 @@ type EventSubscriptor chan EventMessage
 
 func NewEventHandler() *EventHandler {
 	handler := new(EventHandler)
-	handler.subcribed_service = make(map[int]EventSubscriptor)
+	handler.subcribed_service = make(map[EventName]EventSubscriptor)
 	handler.input_pipe = make(chan EventMessage)
 	handler.done = make(chan struct{})
 	return handler
@@ -41,7 +43,7 @@ func (handler EventHandler) Start() {
 			select {
 			case msg := <-handler.input_pipe:
 				for name, service := range handler.subcribed_service {
-					if msg.name == EVENT_ALL || msg.name == name {
+					if msg.Name == EVENT_ALL || msg.Name == name {
 						service <- msg
 					}
 				}
@@ -59,11 +61,11 @@ func (handler EventHandler) Stop() {
 	handler.done <- struct{}{}
 }
 
-func (handler EventHandler) SendMessage(name int, msg EventDataType) {
+func (handler EventHandler) SendMessage(name EventName, msg EventDataType) {
 	message := EventMessage{name, msg}
 	handler.input_pipe <- message
 }
-func (handler EventHandler) Subcribe(name int, channel EventSubscriptor) {
+func (handler EventHandler) Subcribe(name EventName, channel EventSubscriptor) {
 	if _, isNotEmpty := handler.subcribed_service[name]; isNotEmpty {
 		delete(handler.subcribed_service, name)
 	}

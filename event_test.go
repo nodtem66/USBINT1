@@ -46,7 +46,7 @@ func TestEvent_SendMessageToSubscriptor(t *testing.T) {
 	}()
 
 	for msg := range ch {
-		t.Logf("(%d) %d\n", msg.name, msg.status)
+		t.Logf("(%d) %d\n", msg.Name, msg.Status)
 	}
 }
 
@@ -59,7 +59,7 @@ func TestEvent_SendMessageToSubscriptor2(t *testing.T) {
 
 	go func() {
 		for msg := range ch {
-			t.Logf("(%d) %d\n", msg.name, msg.status)
+			t.Logf("(%d) %d\n", msg.Name, msg.Status)
 		}
 	}()
 	e.SendMessage(1, 13)
@@ -78,12 +78,12 @@ func TestEvent_SendMessageToGlobal(t *testing.T) {
 
 	go func() {
 		for msg := range ch {
-			t.Logf("ch: (%d) %d\n", msg.name, msg.status)
+			t.Logf("ch: (%d) %d\n", msg.Name, msg.Status)
 		}
 	}()
 	go func() {
 		for msg := range ch2 {
-			t.Logf("ch2: (%d) %d\n", msg.name, msg.status)
+			t.Logf("ch2: (%d) %d\n", msg.Name, msg.Status)
 		}
 	}()
 
