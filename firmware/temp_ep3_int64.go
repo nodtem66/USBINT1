@@ -3,6 +3,7 @@ package firmware
 import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
+	. "github.com/nodtem66/usbint1/event"
 	"strings"
 )
 
@@ -28,11 +29,15 @@ func TemperatureEP3Int64InitFunc(dev *usb.Device) Firmware {
 	return f
 }
 
-func (t *TemperatureEP3Int64) IOLoop(w chan []byte, done chan struct{}) error {
+func (t *TemperatureEP3Int64) IOLoop(w chan []byte, event *EventHandler) error {
 	endpoint, err := t.OpenEndpoint(1, 0, 0, 0x83)
 	if err != nil {
 		return err
 	}
+
+	// subcribe event from global event manager
+	firmwareEvent := NewEventSubcriptor()
+	event.Subcribe(EVENT_IOLOOP, firmwareEvent)
 
 	go func() {
 		for {
@@ -44,10 +49,12 @@ func (t *TemperatureEP3Int64) IOLoop(w chan []byte, done chan struct{}) error {
 			}
 			select {
 			case w <- buffer[:length]:
-			case <-done:
-				fmt.Printf("close IOLoop for %s\n", t)
-				close(w)
-				return
+			case msg := <-firmwareEvent.Pipe:
+				if msg.Status == EVENT_MAIN_TO_EXIT {
+					fmt.Printf("\nclose IOLoop for %s\n", t)
+					close(w)
+					return
+				}
 			}
 		}
 	}()

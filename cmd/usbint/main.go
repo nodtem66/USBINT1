@@ -5,6 +5,7 @@ import (
 	"fmt"
 	. "github.com/nodtem66/usbint1"
 	"github.com/nodtem66/usbint1/config"
+	. "github.com/nodtem66/usbint1/event"
 	"os"
 	"os/signal"
 	"strconv"
@@ -14,11 +15,6 @@ import (
 const (
 	DEFAULT_DEVICE_VID_PID string = "10C4:8846"
 	DEFAULT_INFLUXDB_HOST  string = "127.0.0.1:8086"
-)
-
-const (
-	EVENT_MAIN_TO_EXIT EventDataType = iota
-	EVENT_MAIN_EXITED
 )
 
 var (
@@ -44,10 +40,10 @@ func main() {
 	fmt.Printf("Initialize USB scanner to device %04X:%04X\n", vid, pid)
 
 	// create channel for exit main program
-	done := make(EventSubscriptor, 3)
+	mainEvent := NewEventSubcriptor()
 	event := NewEventHandler()
 	event.Start()
-	event.Subcribe(EVENT_MAIN, done)
+	event.Subcribe(EVENT_MAIN, mainEvent)
 
 	// start database interface
 
@@ -64,17 +60,16 @@ func main() {
 		for sig := range osSignal {
 			fmt.Println(sig.String())
 			event.SendMessage(EVENT_ALL, EVENT_MAIN_TO_EXIT)
-			//done <- EventMessage{EVENT_ALL, EVENT_MAIN_TO_EXIT}
 		}
 	}()
 
 	// manage event handle
-	for msg := range done {
+	for msg := range mainEvent.Pipe {
 		if msg.Status == EVENT_MAIN_TO_EXIT {
 			scanner.StopScan()
 			scanner.Close()
 			event.Stop()
-			fmt.Println("exit application")
+			fmt.Println("exit main application")
 		}
 	}
 

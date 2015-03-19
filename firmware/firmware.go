@@ -2,6 +2,7 @@ package firmware
 
 import (
 	"github.com/kylelemons/gousb/usb"
+	"github.com/nodtem66/usbint1/event"
 )
 
 type FirmwareId int
@@ -24,7 +25,7 @@ var FirmwareInitFuncMap = map[FirmwareId]FirmwareInitFunc{
 }
 
 type Firmware interface {
-	IOLoop(chan []byte, chan struct{}) error
+	IOLoop(chan []byte, *event.EventHandler) error
 	GetFirmwareId() FirmwareId
 }
 
