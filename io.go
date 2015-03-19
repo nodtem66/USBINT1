@@ -3,6 +3,7 @@ package usbint
 import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
+	. "github.com/nodtem66/usbint1/config"
 	. "github.com/nodtem66/usbint1/event"
 	. "github.com/nodtem66/usbint1/firmware"
 	. "github.com/nodtem66/usbint1/wrapper"
@@ -61,6 +62,8 @@ func NewScanner(vid, pid int) *Scanner {
 				scanner.Close()
 			case EVENT_SCANNER_TO_RETRY:
 				scanner.Retry <- struct{}{}
+			case EVENT_MAIN_TO_EXIT:
+				scanner.EventChannel.Done <- struct{}{}
 			}
 		}
 	}()
@@ -100,7 +103,9 @@ func (s *Scanner) StartScan(e *EventHandler) {
 
 			// start firmware reader, else wait for retry
 			if f != nil {
-				fmt.Printf("Start %s\n", f)
+				if DEBUG && LOG_LEVEL >= 3 {
+					fmt.Printf("Start %s\n", f)
+				}
 				e.SendMessage(EVENT_MAIN, EVENT_SCANNER_CONNECT)
 
 				//firmware_running(s, f)
@@ -123,7 +128,9 @@ func (s *Scanner) StartScan(e *EventHandler) {
 				select {
 				case <-time.After(time.Second * 3):
 					if s.Status == SCANNER_WAIT {
+
 						fmt.Println("timeout 3 second.")
+
 						continue start_scan_loop
 					}
 				case <-s.Retry:
@@ -137,8 +144,6 @@ func (s *Scanner) StartScan(e *EventHandler) {
 	}()
 }
 func (s *Scanner) StopScan() {
-	s.Done <- struct{}{}
-	s.Done <- struct{}{}
 	s.Done <- struct{}{}
 }
 

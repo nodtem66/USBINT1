@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -66,13 +67,25 @@ func main() {
 	// manage event handle
 	for msg := range mainEvent.Pipe {
 		if msg.Status == EVENT_MAIN_TO_EXIT {
+
+			done := event.Stop()
+
+			// wait for end signal for event handler
+		wait_loop:
+			for {
+				select {
+				case <-done:
+					break wait_loop
+				case <-time.After(time.Second * 5):
+					fmt.Println("timeout 5 second")
+					break wait_loop
+				}
+			}
 			scanner.StopScan()
 			scanner.Close()
-			event.Stop()
 			fmt.Println("exit main application")
 		}
 	}
-
 }
 
 func GetVidPidFromString(str string) (vid, pid int) {

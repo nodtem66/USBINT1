@@ -1,5 +1,7 @@
 package event
 
+//import "reflect"
+
 type EventDataType int
 type EventName int
 
@@ -32,7 +34,7 @@ type EventMessage struct {
 // EventHandler
 type EventSubscriptor struct {
 	Pipe chan EventMessage
-	Done chan struct{}
+	Done chan interface{}
 }
 
 // InputPipe is a local channel receied data and sent to subcriptor
@@ -44,7 +46,7 @@ type inputPipe struct {
 func NewEventSubcriptor() *EventSubscriptor {
 	e := &EventSubscriptor{
 		Pipe: make(chan EventMessage, 1),
-		Done: make(chan struct{}, 1),
+		Done: make(chan interface{}, 1),
 	}
 	return e
 }
@@ -92,21 +94,22 @@ func (handler EventHandler) Start() {
 	}()
 }
 
-func (handler EventHandler) Stop() chan struct{} {
+func (handler EventHandler) Stop() chan []interface{} {
 
 	handler.done <- struct{}{}
-	done := make(chan struct{})
-
+	done := make(chan []interface{})
+	returnValue := make([]interface{}, 0)
 	go func() {
 		// wait for done signal for every subcripted service
 		for name, ch := range handler.subcriped_service {
 			if name != EVENT_ALL && name != EVENT_MAIN {
 				//fmt.Printf("wait for %d\n", name)
-				<-ch.Done
+				value := <-ch.Done
+				returnValue = append(returnValue, value)
 				//fmt.Printf("ok for %d\n", name)
 			}
 		}
-		done <- struct{}{}
+		done <- returnValue
 	}()
 	return done
 }

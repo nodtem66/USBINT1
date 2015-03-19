@@ -3,8 +3,10 @@ package firmware
 import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
+	. "github.com/nodtem66/usbint1/config"
 	. "github.com/nodtem66/usbint1/event"
 	"strings"
+	"time"
 )
 
 type TemperatureEP3Int64 struct {
@@ -40,6 +42,7 @@ func (t *TemperatureEP3Int64) IOLoop(w chan []byte, event *EventHandler) error {
 	event.Subcribe(EVENT_IOLOOP, firmwareEvent)
 
 	go func() {
+		var timestamp int64 = time.Now().UnixNano()
 		for {
 			buffer := make([]byte, 64)
 			length, err := endpoint.Read(buffer)
@@ -51,8 +54,20 @@ func (t *TemperatureEP3Int64) IOLoop(w chan []byte, event *EventHandler) error {
 			case w <- buffer[:length]:
 			case msg := <-firmwareEvent.Pipe:
 				if msg.Status == EVENT_MAIN_TO_EXIT {
-					fmt.Printf("\nclose IOLoop for %s\n", t)
 					close(w)
+
+					if DEBUG {
+						// set final total time in msec for benchmark program
+						total_time_msec := (time.Now().UnixNano() - timestamp) / 1000000
+
+						if LOG_LEVEL >= 3 {
+							// output the shutdown message
+							fmt.Printf("\nclose IOLoop for %s\ntotal_time(%.3f sec)\n", t,
+								(float32)(total_time_msec)/1000)
+						}
+						firmwareEvent.Done <- fmt.Sprintf("t%d", total_time_msec)
+					}
+					firmwareEvent.Done <- struct{}{}
 					return
 				}
 			}
