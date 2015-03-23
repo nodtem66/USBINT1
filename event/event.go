@@ -15,7 +15,10 @@ const (
 
 const (
 	EVENT_MAIN_TO_EXIT EventDataType = iota
-	EVENT_MAIN_EXITED
+	EVENT_SCANNER_TO_EXIT
+	EVENT_IOLOOP_TO_EXIT
+	EVENT_WRAPPER_TO_EXIT
+	EVENT_DATABASE_TO_EXIT
 	event_self_destroy
 )
 
@@ -78,9 +81,11 @@ func (handler *EventHandler) Start() {
 					handler.NullPipe()
 
 					// close all subcriped channel
-					for _, service := range handler.subcriped_service {
-						close(service.Pipe)
-					}
+					/*
+						for _, service := range handler.subcriped_service {
+							close(service.Pipe)
+						}
+					*/
 					return
 				}
 				// otherwise boardcast message to subcriped channel
@@ -101,9 +106,6 @@ func (handler *EventHandler) Stop() chan []interface{} {
 
 	done := make(chan []interface{}, 1)
 
-	// destroy the main routine
-	handler.SendMessage(event_self, event_self_destroy)
-
 	// run shutdown routine
 	go func() {
 		returnValue := make([]interface{}, 0)
@@ -113,10 +115,13 @@ func (handler *EventHandler) Stop() chan []interface{} {
 
 				value := <-ch.Done
 				returnValue = append(returnValue, value)
+				close(ch.Pipe)
 
 			}
 
 		}
+		// destroy the main routine
+		handler.SendMessage(event_self, event_self_destroy)
 		done <- returnValue
 	}()
 

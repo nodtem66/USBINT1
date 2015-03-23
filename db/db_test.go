@@ -30,7 +30,7 @@ func TestInflux_NewInfluxWithHostPort(t *testing.T) {
 
 func TestInflux_SetUserPassword(t *testing.T) {
 	i := NewInflux()
-	i.setUserPassword("admin", "pass")
+	i.SetUserPassword("admin", "pass")
 	if i.Username != "admin" || i.Password != "pass" {
 		t.Fail()
 	}
@@ -43,7 +43,7 @@ func TestInflux_Connect(t *testing.T) {
 
 func TestInflux_QueryDatabaseName(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.setUserPassword("dev", "dev")
+	i.SetUserPassword("dev", "dev")
 	err := i.Connect()
 	if err != nil {
 		t.Fatal(err)
@@ -65,9 +65,9 @@ func TestInflux_StartStop(t *testing.T) {
 	event.Start()
 
 	i := NewInfluxWithHostPort(TEST_HOST, 8085)
-	i.setUserPassword("dev", "dev")
+	i.SetUserPassword("dev", "dev")
 	i.Start(event)
-	event.SendMessage(EVENT_ALL, EVENT_MAIN_TO_EXIT)
+	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	done := event.Stop()
 	fmt.Printf("event.Stop()\n")
 	<-done
@@ -75,7 +75,7 @@ func TestInflux_StartStop(t *testing.T) {
 
 func TestInflux_Read(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.setUserPassword("dev", "dev")
+	i.SetUserPassword("dev", "dev")
 	err := i.Connect()
 	if err != nil {
 		t.Fatal(err)
@@ -91,22 +91,23 @@ func TestInflux_Read(t *testing.T) {
 
 func TestInflux_Write(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.setUserPassword("dev", "dev")
+	i.SetUserPassword("dev", "dev")
 	err := i.Connect()
 	if err != nil {
 		t.Fatal()
 	}
 	event := NewEventHandler()
 	event.Start()
+	i.SetPatientId("N1001")
+	i.SetSignalType("test")
+	i.SetReference(3.3)
+	i.SetResolution(1024)
+	i.SetSamplingTime(time.Millisecond)
+	i.SetUnit("mV")
 	i.Start(event)
 
 	data := &InfluxData{
-		Timestamp:  time.Now(),
-		PatientId:  "N1001",
-		SignalType: "test",
-		Resolution: 1,
-		Reference:  1,
-		Unit:       "",
+		Timestamp: time.Now(),
 		Data: []InfluxDataMap{
 			InfluxDataMap{"a": 1},
 			InfluxDataMap{"b": 2},
@@ -115,7 +116,7 @@ func TestInflux_Write(t *testing.T) {
 	}
 	i.Send(data)
 
-	event.SendMessage(EVENT_ALL, EVENT_MAIN_TO_EXIT)
+	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	done := event.Stop()
 	<-done
 }

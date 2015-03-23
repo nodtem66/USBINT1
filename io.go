@@ -7,7 +7,6 @@ import (
 	. "github.com/nodtem66/usbint1/db"
 	. "github.com/nodtem66/usbint1/event"
 	. "github.com/nodtem66/usbint1/firmware"
-	. "github.com/nodtem66/usbint1/wrapper"
 	"time"
 )
 
@@ -20,9 +19,7 @@ const (
 )
 
 const (
-	EVENT_SCANNER_TO_CLOSE EventDataType = iota
-	EVENT_SCANNER_TO_EXIT
-	EVENT_SCANNER_TO_RETRY
+	EVENT_SCANNER_TO_RETRY EventDataType = iota
 	EVENT_SCANNER_WAIT
 	EVENT_SCANNER_FOUND
 	EVENT_SCANNER_CONNECT
@@ -52,32 +49,14 @@ func NewScanner(vid, pid int) *Scanner {
 		Retry:        make(chan struct{}, 1),
 	}
 
-	// manage external event handler
-	go func() {
-		for msg := range scanner.EventChannel.Pipe {
-			if msg.Name == EVENT_ALL {
-				switch msg.Status {
-				case EVENT_SCANNER_TO_RETRY:
-					scanner.Retry <- struct{}{}
-				case EVENT_MAIN_TO_EXIT:
-					scanner.EventChannel.Done <- struct{}{}
-				}
-			} else {
-				switch msg.Status {
-				case EVENT_SCANNER_TO_CLOSE:
-					fallthrough
-				case EVENT_SCANNER_TO_EXIT:
-					scanner.StopScan()
-					scanner.Close()
-				}
-			}
-		}
-	}()
-
 	return scanner
 }
 
 func (s *Scanner) StartScan(e *EventHandler, influx *InfluxHandle) {
+
+	e.Subcribe(EVENT_SCANNER, s.EventChannel)
+
+	// main routine
 	go func() {
 	start_scan_loop:
 		for {
@@ -114,16 +93,10 @@ func (s *Scanner) StartScan(e *EventHandler, influx *InfluxHandle) {
 				}
 				e.SendMessage(EVENT_MAIN, EVENT_SCANNER_CONNECT)
 
-				//firmware_running(s, f)
-				// create wrapper from db and firmwareId
-				// TODO: insert database output channel
-				w := NewWrapper(f.GetFirmwareId(), influx.Pipe, e)
-
 				// run routine usb reader
-				err := f.IOLoop(w, e)
+				err := f.IOLoop(e, influx)
 				if err != nil {
 					fmt.Println(err)
-					close(w)
 					s.Retry <- struct{}{}
 				}
 			} else {
@@ -145,6 +118,27 @@ func (s *Scanner) StartScan(e *EventHandler, influx *InfluxHandle) {
 					continue start_scan_loop
 				case <-s.Done:
 					return
+				}
+			}
+		}
+	}()
+
+	// manage external event handler
+	go func() {
+		for msg := range s.EventChannel.Pipe {
+			if msg.Name == EVENT_ALL {
+				switch msg.Status {
+				case EVENT_SCANNER_TO_EXIT:
+					fallthrough
+				case EVENT_MAIN_TO_EXIT:
+					s.StopScan()
+					s.EventChannel.Done <- struct{}{}
+					e.SendMessage(EVENT_IOLOOP, EVENT_IOLOOP_TO_EXIT)
+				}
+			} else {
+				switch msg.Status {
+				case EVENT_SCANNER_TO_RETRY:
+					s.Retry <- struct{}{}
 				}
 			}
 		}

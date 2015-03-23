@@ -5,11 +5,10 @@ import (
 	"fmt"
 	. "github.com/nodtem66/usbint1"
 	"github.com/nodtem66/usbint1/config"
+	"github.com/nodtem66/usbint1/db"
 	. "github.com/nodtem66/usbint1/event"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -21,14 +20,14 @@ const (
 var (
 	deviceString = flag.String("dev", DEFAULT_DEVICE_VID_PID, "device to "+
 		"listen VENDOR:PRODUCT (hex).")
-	hostInfluxDBString = flag.String("influxdb", "", "Influxdb API address "+
+	hostInfluxDBString = flag.String("influxdb", DEFAULT_INFLUXDB_HOST, "Influxdb API address "+
 		"to host the streaming data.")
+	patientId = flag.String("patient", "", "patient id to store as measurement unit in influxdb")
 )
 
 func main() {
 	//get last execute name
-	i := strings.LastIndex(os.Args[0], config.PATH_SEPERATOR)
-	programName := os.Args[0][i+1:]
+	programName := config.GetProgramName(os.Args[0])
 
 	//replace default usage function
 	flag.Usage = func() {
@@ -37,8 +36,20 @@ func main() {
 	}
 	flag.Parse()
 
-	vid, pid := GetVidPidFromString(*deviceString)
-	fmt.Printf("Initialize USB scanner to device %04X:%04X\n", vid, pid)
+	// check there is patientID
+	if len(*patientId) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: patient cannot be null string\n")
+		flag.Usage()
+		return
+	}
+
+	// parse vendorId, productId from command option
+	vid, pid, err := config.GetVidPidFromString(*deviceString)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s", err)
+		flag.Usage()
+		return
+	}
 
 	// create channel for exit main program
 	mainEvent := NewEventSubcriptor()
@@ -46,12 +57,27 @@ func main() {
 	event.Start()
 	event.Subcribe(EVENT_MAIN, mainEvent)
 
+	// parse host:post parameters from command option
+	host, port, err := config.GetHostPortFromString(*hostInfluxDBString)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s", err)
+		flag.Usage()
+		return
+	}
+
+	// print infomation about daemon
+	fmt.Printf("Patiend ID: %s\nConnect to influxdb %s:%d\n", *patientId, host, port)
+	fmt.Printf("Initialize USB scanner to device %04X:%04X\n", vid, pid)
+
 	// start database interface
+	influx := db.NewInfluxWithHostPort(host, port)
+	influx.SetPatientId(*patientId)
+	influx.Start(event)
 
 	// start scanner
 	scanner := NewScanner(vid, pid)
-	scanner.StartScan(event)
-	event.Subcribe(EVENT_SCANNER, scanner.EventChannel)
+	defer scanner.Close()
+	scanner.StartScan(event, influx)
 
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
@@ -81,32 +107,11 @@ func main() {
 					break wait_loop
 				}
 			}
-			scanner.StopScan()
-			scanner.Close()
+			//scanner.StopScan()
 			fmt.Println("exit main application")
+			return
 		}
 	}
-}
-
-func GetVidPidFromString(str string) (vid, pid int) {
-	// parse XXX:XXX to device vendorId and productId
-	// split AAA:BBB to [AAA BBB]
-	substringDevice := strings.Split(str, ":")
-
-	// If length of substring is not 2, print error
-	if len(substringDevice) != 2 {
-		fmt.Fprintf(os.Stderr, "Error: %s is not valid format\n", str)
-		flag.Usage()
-		return
-	}
-	// convert string to hex
-	if hex, err := strconv.ParseUint(substringDevice[0], 16, 16); err == nil {
-		vid = (int)(hex)
-	}
-	if hex, err := strconv.ParseUint(substringDevice[1], 16, 16); err == nil {
-		pid = (int)(hex)
-	}
-	return
 }
 
 func RedirectOutput() {

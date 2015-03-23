@@ -15,12 +15,7 @@ const (
 	DEFAULT_DATABASE = "dev"
 	LENGTH_QUEUE     = 1024
 	TIMEOUT_MSEC     = 500
-)
-
-const (
-	EVENT_DATABASE_TO_EXIT = iota
-	EVENT_DATABASE_EXITED
-	EVENT_DATABASE_TO_RETRY
+	TIMEOUT_USB_MSEC = 100
 )
 
 // Infomation for a patientid at a specific time
@@ -31,13 +26,8 @@ type InfluxDataMap map[string]interface{}
 // Type for inter-channel exchange. this worker encode into BatchPoint
 // depened on the version of influxdb
 type InfluxData struct {
-	Timestamp  time.Time
-	PatientId  string
-	SignalType string
-	Unit       string
-	Resolution int
-	Reference  int
-	Data       []InfluxDataMap
+	Timestamp time.Time // This timestamp is not used
+	Data      []InfluxDataMap
 }
 
 // A Database worker for insert streaming data into influxdb
@@ -55,6 +45,13 @@ type InfluxHandle struct {
 	Password     string
 	Database     string
 	Version      string
+	PatientId    string
+	SignalType   string
+	Unit         string
+	Resolution   int
+	SamplingTime time.Duration
+	Timestamp    time.Time
+	Reference    float64
 	Pipe         chan *InfluxData
 	EventChannel *EventSubscriptor
 	Done         chan struct{}
@@ -72,6 +69,9 @@ func NewInflux() *InfluxHandle {
 		Pipe:         make(chan *InfluxData, LENGTH_QUEUE),
 		EventChannel: NewEventSubcriptor(),
 		Done:         make(chan struct{}, 1),
+		Resolution:   1,
+		Reference:    1,
+		PatientId:    "none",
 	}
 	return influx
 }
@@ -85,13 +85,39 @@ func NewInfluxWithHostPort(host string, port int) *InfluxHandle {
 }
 
 // set user and password to influx client
-func (i *InfluxHandle) setUserPassword(username string, password string) {
+func (i *InfluxHandle) SetUserPassword(username string, password string) {
 	if len(username) != 0 {
 		i.Username = username
 	}
 	if len(password) != 0 {
 		i.Password = password
 	}
+}
+
+func (i *InfluxHandle) SetSignalType(signal string) {
+	i.SignalType = signal
+}
+
+func (i *InfluxHandle) SetPatientId(id string) {
+	if len(id) > 0 {
+		i.PatientId = id
+	}
+}
+
+func (i *InfluxHandle) SetUnit(unit string) {
+	i.Unit = unit
+}
+
+func (i *InfluxHandle) SetResolution(r int) {
+	if r > 0 {
+		i.Resolution = r
+	}
+}
+func (i *InfluxHandle) SetReference(r float64) {
+	i.Reference = r
+}
+func (i *InfluxHandle) SetSamplingTime(t time.Duration) {
+	i.SamplingTime = t
 }
 
 // create the connection and check connectivity
@@ -156,10 +182,21 @@ func (i *InfluxHandle) Start(e *EventHandler) {
 			} else {
 				// process incoming queue channel
 				for data := range i.Pipe {
+					// check for delay data more than TIMEOUT_USN_MSEC msec
+					// update the global timestamp
+
+					if time.Now().Sub(i.Timestamp) > time.Duration(TIMEOUT_USB_MSEC)*time.Millisecond {
+						i.Timestamp = time.Now()
+					}
+
 					err := i.send(data)
 					if err != nil {
 						fmt.Printf("%s\n", err)
-					}
+					} /*
+						select {
+						case <-i.Done:
+							return
+						}*/
 				}
 			}
 			// wait for retry
@@ -168,8 +205,6 @@ func (i *InfluxHandle) Start(e *EventHandler) {
 				case <-time.After(time.Millisecond * TIMEOUT_MSEC):
 					continue connection_loop
 				case <-i.Done:
-					//fmt.Printf("exit connection & processing loop\n")
-					i.EventChannel.Done <- struct{}{}
 					return
 				}
 			}
@@ -178,11 +213,9 @@ func (i *InfluxHandle) Start(e *EventHandler) {
 
 	go func() {
 		for msg := range i.EventChannel.Pipe {
-			if msg.Name == EVENT_ALL {
-				switch msg.Status {
-				case EVENT_MAIN_TO_EXIT:
-					i.Stop()
-				}
+			if msg.Name == EVENT_DATABASE && msg.Status == EVENT_DATABASE_TO_EXIT {
+				i.Done <- struct{}{}
+				i.EventChannel.Done <- struct{}{}
 			}
 		}
 	}()
@@ -191,7 +224,6 @@ func (i *InfluxHandle) Start(e *EventHandler) {
 
 func (i *InfluxHandle) Stop() {
 	i.Done <- struct{}{}
-	close(i.Pipe)
 }
 
 // transform the InfluxData to BatchPoint and send
@@ -202,33 +234,25 @@ func (ifx *InfluxHandle) send(data *InfluxData) error {
 
 	bp.Database = DEFAULT_DATABASE
 	bp.Precision = "ms"
-	nanosecTime = data.Timestamp
-	nanosecTime = client.SetPrecision(data.Timestamp, bp.Precision)
+	nanosecTime = ifx.Timestamp
+	nanosecTime = client.SetPrecision(data.Timestamp, "ms")
 
-	// check for parameters
-	if len(data.SignalType) == 0 {
-		data.SignalType = "unknown"
-	}
-	if data.Resolution == 0 {
-		data.Resolution = 1
-	}
-	if data.Reference == 0 {
-		data.Reference = 1
-	}
+	// cache tags parameters for speed
 	tags := map[string]string{
-		"type":       data.SignalType,
-		"resolution": strconv.Itoa(data.Resolution),
-		"reference":  strconv.Itoa(data.Reference),
-		"unit":       data.Unit,
+		"type":       ifx.SignalType,
+		"resolution": strconv.Itoa(ifx.Resolution),
+		"reference":  strconv.FormatFloat(ifx.Reference, 'f', 2, 64),
+		"unit":       ifx.Unit,
 	}
 
 	for i, value := range data.Data {
-		points[i].Name = data.PatientId
+		points[i].Name = ifx.PatientId
 		points[i].Tags = tags
 		points[i].Timestamp = nanosecTime
 		points[i].Fields = (map[string]interface{})(value)
-		nanosecTime = nanosecTime.Add(time.Millisecond * time.Duration(data.Resolution))
+		nanosecTime = nanosecTime.Add(ifx.SamplingTime)
 	}
+	ifx.Timestamp = nanosecTime
 	bp.Points = points
 
 	results, err := ifx.Client.Write(bp)
@@ -244,4 +268,11 @@ func (ifx *InfluxHandle) send(data *InfluxData) error {
 // insert InfluxData into sending queue
 func (ifx *InfluxHandle) Send(data *InfluxData) {
 	ifx.Pipe <- data
+}
+
+func (i *InfluxHandle) nullPipe() {
+	go func() {
+		for _ = range i.Pipe {
+		}
+	}()
 }

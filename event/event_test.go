@@ -39,25 +39,6 @@ func TestEvent_SendMessageToSubscriptor(t *testing.T) {
 	e.Subcribe(1, ch)
 
 	go func() {
-		e.SendMessage(1, 10)
-		e.SendMessage(1, 11)
-		e.SendMessage(1, 12)
-		e.Stop()
-	}()
-
-	for msg := range ch.Pipe {
-		t.Logf("(%d) %d\n", msg.Name, msg.Status)
-	}
-}
-
-func TestEvent_SendMessageToSubscriptor2(t *testing.T) {
-	ch := NewEventSubcriptor()
-
-	e := NewEventHandler()
-	e.Start()
-	e.Subcribe(1, ch)
-
-	go func() {
 		for msg := range ch.Pipe {
 			t.Logf("(%d) %d\n", msg.Name, msg.Status)
 		}
@@ -65,6 +46,7 @@ func TestEvent_SendMessageToSubscriptor2(t *testing.T) {
 	e.SendMessage(1, 13)
 	e.SendMessage(1, 14)
 	e.SendMessage(2, 10)
+	//ch.Done <- struct{}{}
 	e.Stop()
 }
 func TestEvent_SendMessageToGlobal(t *testing.T) {
@@ -124,7 +106,7 @@ func TestEvent_Stop(t *testing.T) {
 
 	done := e.Stop()
 
-	e.SendMessage(0, EVENT_MAIN_EXITED)
+	e.SendMessage(0, EVENT_MAIN_TO_EXIT)
 	e.SendMessage(0, 20)
 	e.SendMessage(0, 20)
 	ch.Done <- struct{}{}

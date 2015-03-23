@@ -5,51 +5,61 @@ import (
 	. "github.com/nodtem66/usbint1/config"
 	. "github.com/nodtem66/usbint1/db"
 	. "github.com/nodtem66/usbint1/event"
-	. "github.com/nodtem66/usbint1/firmware"
 	"sync/atomic"
 )
 
-type WrapperInitFunc func([]byte) error
+type WrapperId int
+type WrapperInitFunc func([]byte) (*InfluxData, error)
 
-var WrapperFuncMap = map[FirmwareId]WrapperInitFunc{
-	FIRMWARE_TEMPERATURE_EP3_INT64: WrapperTemperatureEP3Int64,
+const (
+	WRAPPER_TEMPERATURE_SIMPLE WrapperId = iota
+)
+
+var WrapperFuncMap = map[WrapperId]WrapperInitFunc{
+	WRAPPER_TEMPERATURE_SIMPLE: WrapperTemperatureSimple,
 }
 
-func NewWrapper(fid FirmwareId, out chan InfluxData, e *EventHandler) chan []byte {
+func NewWrapper(id WrapperId, e *EventHandler, out chan *InfluxData) chan []byte {
 	input := make(chan []byte, 64)
+
 	wrapperEvent := NewEventSubcriptor()
 	e.Subcribe(EVENT_WRAPPER, wrapperEvent)
 
 	var count uint64 = 0
 	go func() {
-		//TODO: wrap data from input channel
+		// process the data from firmware channel
 		for in := range input {
 
-			err := WrapperFuncMap[fid](in)
+			// wrap the data with wrapper function
+			data, err := WrapperFuncMap[id](in)
+
 			if err != nil {
 				fmt.Printf("\nWrapper Error: %s\n", in)
 			}
 			atomic.AddUint64(&count, 1)
+			// send to influxdb
+			out <- data
 		}
 	}()
 
 	go func() {
-		for {
-			select {
-			case msg := <-wrapperEvent.Pipe:
-				if msg.Status == EVENT_MAIN_TO_EXIT {
-					total_count := atomic.LoadUint64(&count)
-					if DEBUG {
-						if LOG_LEVEL >= 3 {
-							fmt.Printf("\nstop wrapper loop for firmwareID(%d)"+
-								"\ntotal_count(%d)\n", fid, total_count)
-						}
-						wrapperEvent.Done <- fmt.Sprintf("c%d", total_count)
-					} else {
-						wrapperEvent.Done <- struct{}{}
+		for msg := range wrapperEvent.Pipe {
+			if msg.Name == EVENT_WRAPPER && msg.Status == EVENT_WRAPPER_TO_EXIT {
+
+				total_count := atomic.LoadUint64(&count)
+				if DEBUG {
+					if LOG_LEVEL >= 3 {
+						fmt.Printf("\nstop wrapper loop for firmwareID(%d)"+
+							"\ntotal_count(%d)\n", id, total_count)
 					}
-					return
+					wrapperEvent.Done <- fmt.Sprintf("c%d", total_count)
+				} else {
+					wrapperEvent.Done <- struct{}{}
 				}
+				close(input)
+				e.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
+
+				return
 			}
 		}
 	}()
