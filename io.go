@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
 	. "github.com/nodtem66/usbint1/config"
+	. "github.com/nodtem66/usbint1/db"
 	. "github.com/nodtem66/usbint1/event"
 	. "github.com/nodtem66/usbint1/firmware"
 	. "github.com/nodtem66/usbint1/wrapper"
@@ -19,7 +20,7 @@ const (
 )
 
 const (
-	EVENT_SCANNER_TO_CLOSE EventDataType = iota + EVENT__END + 1
+	EVENT_SCANNER_TO_CLOSE EventDataType = iota
 	EVENT_SCANNER_TO_EXIT
 	EVENT_SCANNER_TO_RETRY
 	EVENT_SCANNER_WAIT
@@ -54,16 +55,21 @@ func NewScanner(vid, pid int) *Scanner {
 	// manage external event handler
 	go func() {
 		for msg := range scanner.EventChannel.Pipe {
-			switch msg.Status {
-			case EVENT_SCANNER_TO_CLOSE:
-				fallthrough
-			case EVENT_SCANNER_TO_EXIT:
-				scanner.StopScan()
-				scanner.Close()
-			case EVENT_SCANNER_TO_RETRY:
-				scanner.Retry <- struct{}{}
-			case EVENT_MAIN_TO_EXIT:
-				scanner.EventChannel.Done <- struct{}{}
+			if msg.Name == EVENT_ALL {
+				switch msg.Status {
+				case EVENT_SCANNER_TO_RETRY:
+					scanner.Retry <- struct{}{}
+				case EVENT_MAIN_TO_EXIT:
+					scanner.EventChannel.Done <- struct{}{}
+				}
+			} else {
+				switch msg.Status {
+				case EVENT_SCANNER_TO_CLOSE:
+					fallthrough
+				case EVENT_SCANNER_TO_EXIT:
+					scanner.StopScan()
+					scanner.Close()
+				}
 			}
 		}
 	}()
@@ -71,7 +77,7 @@ func NewScanner(vid, pid int) *Scanner {
 	return scanner
 }
 
-func (s *Scanner) StartScan(e *EventHandler) {
+func (s *Scanner) StartScan(e *EventHandler, influx *InfluxHandle) {
 	go func() {
 	start_scan_loop:
 		for {
@@ -110,7 +116,8 @@ func (s *Scanner) StartScan(e *EventHandler) {
 
 				//firmware_running(s, f)
 				// create wrapper from db and firmwareId
-				w := NewWrapper(f.GetFirmwareId(), nil, e)
+				// TODO: insert database output channel
+				w := NewWrapper(f.GetFirmwareId(), influx.Pipe, e)
 
 				// run routine usb reader
 				err := f.IOLoop(w, e)

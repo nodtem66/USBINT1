@@ -121,14 +121,15 @@ func TestEvent_Stop(t *testing.T) {
 	e.SendMessage(2, 20)
 	e.SendMessage(3, 20)
 	e.SendMessage(0, 20)
+
 	done := e.Stop()
+
 	e.SendMessage(0, EVENT_MAIN_EXITED)
 	e.SendMessage(0, 20)
 	e.SendMessage(0, 20)
 	ch.Done <- struct{}{}
 	ch2.Done <- struct{}{}
 
-	t.Logf("wait for stop response\n")
 	<-done
-	t.Logf("STOP!!\n")
+
 }

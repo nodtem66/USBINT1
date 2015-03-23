@@ -108,3 +108,8 @@ func GetVidPidFromString(str string) (vid, pid int) {
 	}
 	return
 }
+
+func RedirectOutput() {
+	//TODO: redirect stdout to file
+	//http://www.antonlindstrom.com/2014/11/17/capture-stdout-in-golang.html
+}

@@ -1,7 +1,5 @@
 package event
 
-//import "reflect"
-
 type EventDataType int
 type EventName int
 
@@ -12,16 +10,13 @@ const (
 	EVENT_IOLOOP
 	EVENT_WRAPPER
 	EVENT_DATABASE
+	event_self
 )
 
 const (
 	EVENT_MAIN_TO_EXIT EventDataType = iota
 	EVENT_MAIN_EXITED
-	EVENT_SCANNER_EXITED
-	EVENT_IOLOOP_EXITED
-	EVENT_WRAPPER_EXITED
-	EVENT_DATABASE_EXITED
-	EVENT__END
+	event_self_destroy
 )
 
 // EventMessage structure of message in Event channel pipe
@@ -55,7 +50,6 @@ func NewEventSubcriptor() *EventSubscriptor {
 type EventHandler struct {
 	subcriped_service map[EventName]*EventSubscriptor
 	input_pipe        *inputPipe
-	done              chan struct{}
 }
 
 func NewEventHandler() *EventHandler {
@@ -65,66 +59,86 @@ func NewEventHandler() *EventHandler {
 		pipe:     make(chan EventMessage, 1),
 		isClosed: false,
 	}
-	handler.done = make(chan struct{})
+
 	return handler
 }
 
-func (handler EventHandler) Start() {
-	go func() {
+func (handler *EventHandler) Start() {
 
+	// start main rountine for incoming message
+	go func() {
 		for {
 			select {
 			case msg := <-handler.input_pipe.pipe:
+
+				// check for self destroying message
+				if msg.Name == event_self && msg.Status == event_self_destroy {
+
+					// swap current pipe with null pipe
+					handler.NullPipe()
+
+					// close all subcriped channel
+					for _, service := range handler.subcriped_service {
+						close(service.Pipe)
+					}
+					return
+				}
+				// otherwise boardcast message to subcriped channel
 				for name, service := range handler.subcriped_service {
+
 					if msg.Name == EVENT_ALL || msg.Name == name {
 						service.Pipe <- msg
 					}
+
 				}
-			case <-handler.done:
-				handler.input_pipe.isClosed = true
-				for _, service := range handler.subcriped_service {
-					close(service.Pipe)
-				}
-				//fmt.Println("exit loop ")
-				//fmt.Printf("isClose %#v\n", handler.input_pipe.isClosed)
-				return
 			}
 		}
 
 	}()
 }
 
-func (handler EventHandler) Stop() chan []interface{} {
+func (handler *EventHandler) Stop() chan []interface{} {
 
-	handler.done <- struct{}{}
-	done := make(chan []interface{})
-	returnValue := make([]interface{}, 0)
+	done := make(chan []interface{}, 1)
+
+	// destroy the main routine
+	handler.SendMessage(event_self, event_self_destroy)
+
+	// run shutdown routine
 	go func() {
+		returnValue := make([]interface{}, 0)
 		// wait for done signal for every subcripted service
 		for name, ch := range handler.subcriped_service {
 			if name != EVENT_ALL && name != EVENT_MAIN {
-				//fmt.Printf("wait for %d\n", name)
+
 				value := <-ch.Done
 				returnValue = append(returnValue, value)
-				//fmt.Printf("ok for %d\n", name)
+
 			}
+
 		}
 		done <- returnValue
 	}()
+
 	return done
 }
 
-func (handler EventHandler) SendMessage(name EventName, msg EventDataType) {
+func (handler *EventHandler) SendMessage(name EventName, msg EventDataType) {
+
 	message := EventMessage{name, msg}
-	//fmt.Printf("isClose %#v\n", handler.input_pipe.isClosed)
-	if !handler.input_pipe.isClosed {
-		//fmt.Printf("%d -> %d\n", name, msg)
-		handler.input_pipe.pipe <- message
-	}
+	handler.input_pipe.pipe <- message
+
 }
-func (handler EventHandler) Subcribe(name EventName, channel *EventSubscriptor) {
+func (handler *EventHandler) Subcribe(name EventName, channel *EventSubscriptor) {
 	if _, isNotEmpty := handler.subcriped_service[name]; isNotEmpty {
 		delete(handler.subcriped_service, name)
 	}
 	handler.subcriped_service[name] = channel
+}
+func (handler *EventHandler) NullPipe() {
+	// buffer routine for left incoming data
+	go func() {
+		for _ = range handler.input_pipe.pipe {
+		}
+	}()
 }
