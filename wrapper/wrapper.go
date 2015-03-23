@@ -9,7 +9,7 @@ import (
 )
 
 type WrapperId int
-type WrapperInitFunc func([]byte) (*InfluxData, error)
+type WrapperInitFunc func([]byte) ([]InfluxData, error)
 
 const (
 	WRAPPER_TEMPERATURE_SIMPLE WrapperId = iota
@@ -19,7 +19,7 @@ var WrapperFuncMap = map[WrapperId]WrapperInitFunc{
 	WRAPPER_TEMPERATURE_SIMPLE: WrapperTemperatureSimple,
 }
 
-func NewWrapper(id WrapperId, e *EventHandler, out chan *InfluxData) chan []byte {
+func NewWrapper(id WrapperId, e *EventHandler, out chan []InfluxData) chan []byte {
 	input := make(chan []byte, 64)
 
 	wrapperEvent := NewEventSubcriptor()
@@ -27,18 +27,21 @@ func NewWrapper(id WrapperId, e *EventHandler, out chan *InfluxData) chan []byte
 
 	var count uint64 = 0
 	go func() {
+
 		// process the data from firmware channel
 		for in := range input {
 
 			// wrap the data with wrapper function
 			data, err := WrapperFuncMap[id](in)
-
 			if err != nil {
 				fmt.Printf("\nWrapper Error: %s\n", in)
 			}
+
 			atomic.AddUint64(&count, 1)
+
 			// send to influxdb
 			out <- data
+
 		}
 	}()
 

@@ -106,14 +106,12 @@ func TestInflux_Write(t *testing.T) {
 	i.SetUnit("mV")
 	i.Start(event)
 
-	data := &InfluxData{
-		Timestamp: time.Now(),
-		Data: []InfluxDataMap{
-			InfluxDataMap{"a": 1},
-			InfluxDataMap{"b": 2},
-			InfluxDataMap{"c1": 3, "c2": 4},
-		},
+	data := []InfluxData{
+		InfluxData{"a": 1},
+		InfluxData{"b": 2},
+		InfluxData{"c1": 3, "c2": 4},
 	}
+
 	i.Send(data)
 
 	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)

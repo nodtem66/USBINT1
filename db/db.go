@@ -21,14 +21,15 @@ const (
 // Infomation for a patientid at a specific time
 // eg. {"channel1": 1001, "channel2": 1201.1}
 // {"unit": "mV", "resolution": 12, "reference": 5}
-type InfluxDataMap map[string]interface{}
+type InfluxData map[string]interface{}
 
 // Type for inter-channel exchange. this worker encode into BatchPoint
 // depened on the version of influxdb
+/*
 type InfluxData struct {
 	Timestamp time.Time // This timestamp is not used
 	Data      []InfluxDataMap
-}
+}*/
 
 // A Database worker for insert streaming data into influxdb
 // usage:
@@ -52,7 +53,7 @@ type InfluxHandle struct {
 	SamplingTime time.Duration
 	Timestamp    time.Time
 	Reference    float64
-	Pipe         chan *InfluxData
+	Pipe         chan []InfluxData
 	EventChannel *EventSubscriptor
 	Done         chan struct{}
 	ShouldDump   bool
@@ -66,7 +67,7 @@ func NewInflux() *InfluxHandle {
 		Port:         DEFAULT_PORT,
 		Username:     "root",
 		Password:     "root",
-		Pipe:         make(chan *InfluxData, LENGTH_QUEUE),
+		Pipe:         make(chan []InfluxData, LENGTH_QUEUE),
 		EventChannel: NewEventSubcriptor(),
 		Done:         make(chan struct{}, 1),
 		Resolution:   1,
@@ -180,18 +181,36 @@ func (i *InfluxHandle) Start(e *EventHandler) {
 			if err != nil {
 				fmt.Println(err)
 			} else {
+
+				buffer := make([]InfluxData, 0)
 				// process incoming queue channel
 				for data := range i.Pipe {
 					// check for delay data more than TIMEOUT_USN_MSEC msec
 					// update the global timestamp
 
-					if time.Now().Sub(i.Timestamp) > time.Duration(TIMEOUT_USB_MSEC)*time.Millisecond {
-						i.Timestamp = time.Now()
+					for _, v := range data {
+						// store the point in buffer
+						buffer = append(buffer, v)
 					}
 
-					err := i.send(data)
-					if err != nil {
-						fmt.Printf("%s\n", err)
+					// release 100 point
+					isTimeout := time.Now().Sub(i.Timestamp) > time.Duration(TIMEOUT_USB_MSEC)*time.Millisecond
+					if isTimeout {
+						if len(buffer) > 0 {
+							err := i.send(buffer)
+							if err != nil {
+								fmt.Printf("%s\n", err)
+							}
+							buffer = buffer[:0]
+						}
+						i.Timestamp = time.Now()
+					}
+					if len(buffer) > 100 {
+						err := i.send(buffer)
+						if err != nil {
+							fmt.Printf("%s\n", err)
+						}
+						buffer = buffer[:0]
 					} /*
 						select {
 						case <-i.Done:
@@ -227,15 +246,15 @@ func (i *InfluxHandle) Stop() {
 }
 
 // transform the InfluxData to BatchPoint and send
-func (ifx *InfluxHandle) send(data *InfluxData) error {
+func (ifx *InfluxHandle) send(data []InfluxData) error {
 	var bp client.BatchPoints
 	var nanosecTime time.Time
-	points := make([]client.Point, len(data.Data))
+	points := make([]client.Point, len(data))
 
 	bp.Database = DEFAULT_DATABASE
 	bp.Precision = "ms"
 	nanosecTime = ifx.Timestamp
-	nanosecTime = client.SetPrecision(data.Timestamp, "ms")
+	nanosecTime = client.SetPrecision(ifx.Timestamp, "ms")
 
 	// cache tags parameters for speed
 	tags := map[string]string{
@@ -245,7 +264,7 @@ func (ifx *InfluxHandle) send(data *InfluxData) error {
 		"unit":       ifx.Unit,
 	}
 
-	for i, value := range data.Data {
+	for i, value := range data {
 		points[i].Name = ifx.PatientId
 		points[i].Tags = tags
 		points[i].Timestamp = nanosecTime
@@ -266,7 +285,7 @@ func (ifx *InfluxHandle) send(data *InfluxData) error {
 }
 
 // insert InfluxData into sending queue
-func (ifx *InfluxHandle) Send(data *InfluxData) {
+func (ifx *InfluxHandle) Send(data []InfluxData) {
 	ifx.Pipe <- data
 }
 
