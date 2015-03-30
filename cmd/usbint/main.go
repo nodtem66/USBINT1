@@ -70,9 +70,9 @@ func main() {
 	fmt.Printf("Initialize USB scanner to device %04X:%04X\n", vid, pid)
 
 	// start database interface
-	influx := db.NewInfluxWithHostPort(host, port)
-	influx.SetPatientId(*patientId)
-	influx.Start(event)
+	// influx := db.NewInfluxWithHostPort(host, port)
+	// influx.PatientId = *patientId
+	// influx.Start(event)
 
 	// start scanner
 	scanner := NewScanner(vid, pid)

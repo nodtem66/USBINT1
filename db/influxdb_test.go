@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	TEST_HOST = "10.99.3.91"
+	TEST_HOST = "10.99.19.194"
 	TEST_PORT = 8086
 )
 
@@ -30,7 +30,8 @@ func TestInflux_NewInfluxWithHostPort(t *testing.T) {
 
 func TestInflux_SetUserPassword(t *testing.T) {
 	i := NewInflux()
-	i.SetUserPassword("admin", "pass")
+	i.Username = "admin"
+	i.Password = "pass"
 	if i.Username != "admin" || i.Password != "pass" {
 		t.Fail()
 	}
@@ -43,7 +44,8 @@ func TestInflux_Connect(t *testing.T) {
 
 func TestInflux_QueryDatabaseName(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.SetUserPassword("dev", "dev")
+	i.Username = "dev"
+	i.Password = "dev"
 	err := i.Connect()
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +67,8 @@ func TestInflux_StartStop(t *testing.T) {
 	event.Start()
 
 	i := NewInfluxWithHostPort(TEST_HOST, 8085)
-	i.SetUserPassword("dev", "dev")
+	i.Username = "dev"
+	i.Password = "dev"
 	i.Start(event)
 	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	done := event.Stop()
@@ -75,7 +78,8 @@ func TestInflux_StartStop(t *testing.T) {
 
 func TestInflux_Read(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.SetUserPassword("dev", "dev")
+	i.Username = "dev"
+	i.Password = "dev"
 	err := i.Connect()
 	if err != nil {
 		t.Fatal(err)
@@ -91,19 +95,20 @@ func TestInflux_Read(t *testing.T) {
 
 func TestInflux_Write(t *testing.T) {
 	i := NewInfluxWithHostPort(TEST_HOST, TEST_PORT)
-	i.SetUserPassword("dev", "dev")
+	i.Username = "dev"
+	i.Password = "dev"
 	err := i.Connect()
 	if err != nil {
 		t.Fatal()
 	}
 	event := NewEventHandler()
 	event.Start()
-	i.SetPatientId("N1001")
-	i.SetSignalType("test")
-	i.SetReference(3.3)
-	i.SetResolution(1024)
-	i.SetSamplingTime(time.Millisecond)
-	i.SetUnit("mV")
+	i.PatientId = "N1001"
+	i.SignalType = "test"
+	i.Reference = 3.3
+	i.Resolution = 1024
+	i.SamplingTime = time.Millisecond
+	i.Unit = "mV"
 	i.Start(event)
 
 	data := []InfluxData{
