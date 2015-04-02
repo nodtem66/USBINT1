@@ -104,8 +104,8 @@ func TestInflux_Write(t *testing.T) {
 	event := NewEventHandler()
 	event.Start()
 	i.PatientId = "N1001"
-	i.SignalType = "test"
-	i.Reference = 3.3
+	i.Measurement = "test"
+	i.ReferenceMax = 3.3
 	i.Resolution = 1024
 	i.SamplingTime = time.Millisecond
 	i.Unit = "mV"

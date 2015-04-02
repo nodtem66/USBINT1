@@ -64,13 +64,13 @@ func NewInflux() *InfluxHandle {
 		EventChannel: NewEventSubcriptor(),
 		Done:         make(chan struct{}, 1),
 		DataTag: DataTag{
-			Resolution: 1,
-			Reference:  1,
-			PatientId:  "none",
+			Resolution:   1,
+			ReferenceMax: 1,
+			PatientId:    "none",
 		},
 	}
 	return influx
-
+}
 
 // new influx client with host (string) and port (int)
 func NewInfluxWithHostPort(host string, port int) *InfluxHandle {
@@ -217,9 +217,9 @@ func (ifx *InfluxHandle) send(data []InfluxData) error {
 
 	// cache tags parameters for speed
 	tags := map[string]string{
-		"type":       ifx.SignalType,
+		"type":       ifx.Measurement,
 		"resolution": strconv.Itoa(ifx.Resolution),
-		"reference":  strconv.FormatFloat(ifx.Reference, 'f', 2, 64),
+		"reference":  strconv.FormatFloat(ifx.ReferenceMax, 'f', 2, 64),
 		"unit":       ifx.Unit,
 	}
 

@@ -51,11 +51,6 @@ func (t *TemperatureEP3Int64) IOLoop(event *EventHandler, influx *InfluxHandle) 
 		influx.SetUnit("d")
 		influx.SetUserPassword("dev", "dev")
 	*/
-	influx.SetReference(0)
-	influx.SetSamplingTime(time.Millisecond)
-	influx.SetSignalType("temperature")
-	influx.SetUnit("Celsius")
-	influx.SetUserPassword("dev", "dev")
 
 	// new wrapper
 	w := NewWrapper(WRAPPER_TEMPERATURE_SIMPLE, event, influx.Pipe)
