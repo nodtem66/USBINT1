@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DEFAULT_DEVICE_VID_PID = "10C4:1203"
+	DEFAULT_DEVICE_VID_PID = "10C4:8846"
 )
 
 type CommandLine struct {
@@ -74,9 +74,12 @@ func main() {
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
 	signal.Notify(osSignal, os.Kill)
+	done := make(chan bool)
 	go func() {
 		for sig := range osSignal {
 			fmt.Printf("Event: %s\n", sig.String())
+			done <- true
 		}
 	}()
+	<-done
 }

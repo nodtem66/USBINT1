@@ -1,153 +1,143 @@
+// USBINT Firmware for host
 package usbint
 
 import (
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
-	. "github.com/nodtem66/usbint1/config"
-	. "github.com/nodtem66/usbint1/db"
-	. "github.com/nodtem66/usbint1/event"
-	. "github.com/nodtem66/usbint1/firmware"
 	"time"
 )
 
-type ScannerStatus int
-
 const (
-	SCANNER_WAIT ScannerStatus = iota
-	SCANNER_FOUND
-	SCANNER_CONNECTED
+	LENGTH_PIPE = 1024
 )
 
-const (
-	EVENT_SCANNER_TO_RETRY EventDataType = iota
-	EVENT_SCANNER_WAIT
-	EVENT_SCANNER_FOUND
-	EVENT_SCANNER_CONNECT
-)
-
-type Scanner struct {
-	Context             *usb.Context
-	VendorId, ProductId int
-	Status              ScannerStatus
-	EventChannel        *EventSubscriptor
-	Done                chan struct{}
-	Retry               chan struct{}
+type IOHandle struct {
+	StartTime  time.Time
+	PacketRead int64
+	PacketPipe int64
+	Quit       chan bool
+	Pipe       chan []byte
+	Dev        *DeviceHandle
+}
+type DeviceHandle struct {
+	Context *usb.Context
+	Device  *usb.Device
+	maxSize int
+	EpAddr  int
+	openErr error
 }
 
-func NewScanner(vid, pid int) *Scanner {
-
-	c := usb.NewContext()
-	c.Debug(0)
-
-	scanner := &Scanner{
-		Context:      c,
-		VendorId:     vid,
-		ProductId:    pid,
-		EventChannel: NewEventSubcriptor(),
-		Status:       SCANNER_WAIT,
-		Done:         make(chan struct{}, 3),
-		Retry:        make(chan struct{}, 1),
+func NewIOHandle() *IOHandle {
+	io := &IOHandle{
+		Quit: make(chan bool),
+		Pipe: make(chan []byte, LENGTH_PIPE),
 	}
-
-	return scanner
+	return io
 }
+func (i *IOHandle) OpenDevice(vid, pid int) error {
+	// scan for usb device that match vid pid
+	i.Dev = &DeviceHandle{
+		Context: usb.NewContext(),
+	}
+	var devices []*usb.Device
+	devices, i.Dev.openErr = i.Dev.Context.ListDevices(func(desc *usb.Descriptor) bool {
+		if desc.Vendor == usb.ID(vid) && desc.Product == usb.ID(pid) {
+			return true
+		}
+		return false
+	})
+	if len(devices) == 0 {
+		i.Dev.openErr = fmt.Errorf("No devices")
+	}
+	// if Err, close handle
+	if i.Dev.openErr != nil && i.Dev.openErr != usb.ERROR_NOT_FOUND {
+		i.Dev.Context.Close()
+		return i.Dev.openErr
+	}
+	// in the case devices have same VID/PID; the first openable device is selected
+	for i, dev := range devices {
+		if i != 1 {
+			dev.Close()
+		}
+	}
+	i.Dev.Device = devices[0]
+	eps := devices[0].Configs[0].Interfaces[0].Setups[0].Endpoints
+	ep := eps[len(eps)-1]
+	i.Dev.maxSize = int(ep.MaxPacketSize)
+	i.Dev.EpAddr = int(ep.Address)
+	return nil
+}
+func (i *IOHandle) Start() {
 
-func (s *Scanner) StartScan(e *EventHandler, influx *InfluxHandle) {
-
-	e.Subcribe(EVENT_SCANNER, s.EventChannel)
-
+	// start timer
+	fmt.Printf("[IO Start at %s]\n", time.Now())
+	i.StartTime = time.Now()
 	// main routine
 	go func() {
-	start_scan_loop:
+
+		// Pre-initialize variable
+		var length int
+		var err, openErr error
+		var buffer []byte
+		var endpoint usb.Endpoint
+		isOpen := false
+
+		// check the device is opened
+		if i.Dev != nil && i.Dev.openErr == nil {
+			// prepare buffer
+			buffer = make([]byte, i.Dev.maxSize)
+			// open endpoint
+			endpoint, openErr = i.Dev.Device.OpenEndpoint(1, 1, 1, uint8(i.Dev.EpAddr))
+			if openErr != nil {
+				fmt.Printf("Error: %s\n", openErr)
+			} else {
+				isOpen = true
+			}
+		}
+
+		// main loop
 		for {
-			// select all device with specific vid,pid
-			e.SendMessage(EVENT_MAIN, EVENT_SCANNER_WAIT)
-			devices, err := s.Context.ListDevices(func(desc *usb.Descriptor) bool {
-
-				// check if device has a selected vid, pid
-				if int(desc.Vendor) == s.VendorId && int(desc.Product) == s.ProductId {
-					return true
-				}
-				return false
-			})
-			if err != nil && len(devices) == 0 {
-				fmt.Println(err)
-			}
-
-			// select the first device that can be initialized
-			var f Firmware
-			for i, d := range devices {
-				if i == 0 {
-					f = NewFirmware(d)
-					s.Status = SCANNER_FOUND
-					e.SendMessage(EVENT_MAIN, EVENT_SCANNER_FOUND)
-				} else {
-					d.Close()
-				}
-			}
-
-			// start firmware reader, else wait for retry
-			if f != nil {
-				if DEBUG && LOG_LEVEL >= 3 {
-					fmt.Printf("Start %s\n", f)
-				}
-				e.SendMessage(EVENT_MAIN, EVENT_SCANNER_CONNECT)
-
-				// run routine usb reader
-				err := f.IOLoop(e, influx)
+			// read
+			if isOpen {
+				length, err = endpoint.Read(buffer)
 				if err != nil {
-					fmt.Println(err)
-					s.Retry <- struct{}{}
-				}
-			} else {
-				fmt.Println("wait for device")
-			}
-
-			// wait for retry
-			for {
-				select {
-				case <-time.After(time.Second * 3):
-					if s.Status == SCANNER_WAIT {
-
-						fmt.Println("timeout 3 second.")
-
-						continue start_scan_loop
+					fmt.Printf("Error: %s\n", err)
+				} else {
+					i.PacketRead++
+					select {
+					case i.Pipe <- buffer[:length]:
+						i.PacketPipe++
 					}
-				case <-s.Retry:
-					fmt.Println("Retry!")
-					continue start_scan_loop
-				case <-s.Done:
-					return
 				}
+			}
+
+			select {
+			case <-i.Quit:
+				// check the device is opened
+				if i.Dev != nil && i.Dev.openErr == nil {
+					// then close all connection
+					i.Dev.Context.Close()
+					i.Dev.Device.Close()
+				}
+				i.Quit <- true
+				return
 			}
 		}
 	}()
-
-	// manage external event handler
-	go func() {
-		for msg := range s.EventChannel.Pipe {
-			if msg.Name == EVENT_ALL {
-				switch msg.Status {
-				case EVENT_SCANNER_TO_EXIT:
-					fallthrough
-				case EVENT_MAIN_TO_EXIT:
-					s.StopScan()
-					s.EventChannel.Done <- struct{}{}
-					e.SendMessage(EVENT_IOLOOP, EVENT_IOLOOP_TO_EXIT)
-				}
-			} else {
-				switch msg.Status {
-				case EVENT_SCANNER_TO_RETRY:
-					s.Retry <- struct{}{}
-				}
-			}
-		}
-	}()
-}
-func (s *Scanner) StopScan() {
-	s.Done <- struct{}{}
+	return
 }
 
-func (s *Scanner) Close() {
-	s.Context.Close()
+func (i *IOHandle) Stop() {
+	// send shutdown signal
+	i.Quit <- true
+	// wait for shutdown process
+	<-i.Quit
+	// stop timer
+	totalSec := time.Now().Sub(i.StartTime).Seconds()
+	fmt.Printf("[IO Stop] [Running Time %f sec] [Read %d Loss %d]\n", totalSec, i.PacketRead, i.PacketRead-i.PacketPipe)
+}
+
+func isOpen(ch chan bool) (ok bool) {
+	_, ok = <-ch
+	return
 }
