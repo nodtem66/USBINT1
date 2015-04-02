@@ -3,81 +3,72 @@ package main
 import (
 	"flag"
 	"fmt"
-	. "github.com/nodtem66/usbint1"
-	"github.com/nodtem66/usbint1/config"
-	"github.com/nodtem66/usbint1/db"
-	. "github.com/nodtem66/usbint1/event"
 	"os"
 	"os/signal"
-	"time"
+	"strconv"
+	"strings"
 )
 
 const (
-	DEFAULT_DEVICE_VID_PID string = "10C4:8846"
-	DEFAULT_INFLUXDB_HOST  string = "127.0.0.1:8086"
+	DEFAULT_DEVICE_VID_PID = "10C4:1203"
 )
 
-var (
-	deviceString = flag.String("dev", DEFAULT_DEVICE_VID_PID, "device to "+
-		"listen VENDOR:PRODUCT (hex).")
-	hostInfluxDBString = flag.String("influxdb", DEFAULT_INFLUXDB_HOST, "Influxdb API address "+
-		"to host the streaming data.")
-	patientId = flag.String("patient", "", "patient id to store as measurement unit in influxdb")
-)
+type CommandLine struct {
+	Vid       int
+	Pid       int
+	VidPid    string
+	PatientId string
+	Verbose   bool
+}
 
-func main() {
-	//get last execute name
-	programName := config.GetProgramName(os.Args[0])
-
-	//replace default usage function
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", programName)
-		flag.PrintDefaults()
-	}
-	flag.Parse()
+func (c *CommandLine) ParseOption() (err error) {
 
 	// check there is patientID
-	if len(*patientId) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: patient cannot be null string\n")
-		flag.Usage()
+	if len(c.PatientId) == 0 {
+		err = fmt.Errorf("`%s` is not a valid patient id", c.PatientId)
 		return
 	}
 
-	// parse vendorId, productId from command option
-	vid, pid, err := config.GetVidPidFromString(*deviceString)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s", err)
-		flag.Usage()
+	// parse XXX:XXX to device vendorId and productId
+	// split AAA:BBB to [AAA BBB]
+	s := strings.Split(c.VidPid, ":")
+
+	// If length of substring is not 2, print error
+	if len(s) != 2 {
+		err = fmt.Errorf("`%s` is not a valid vid:pid", c.VidPid)
 		return
 	}
-
-	// create channel for exit main program
-	mainEvent := NewEventSubcriptor()
-	event := NewEventHandler()
-	event.Start()
-	event.Subcribe(EVENT_MAIN, mainEvent)
-
-	// parse host:post parameters from command option
-	host, port, err := config.GetHostPortFromString(*hostInfluxDBString)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s", err)
-		flag.Usage()
-		return
+	// convert string to hex
+	var hex uint64
+	if hex, err = strconv.ParseUint(s[0], 16, 16); err == nil {
+		c.Vid = (int)(hex)
+	}
+	if hex, err = strconv.ParseUint(s[1], 16, 16); err == nil {
+		c.Pid = (int)(hex)
 	}
 
-	// print infomation about daemon
-	fmt.Printf("Patiend ID: %s\nConnect to influxdb %s:%d\n", *patientId, host, port)
-	fmt.Printf("Initialize USB scanner to device %04X:%04X\n", vid, pid)
+	//logger.SetLogLevel()
+	return
+}
 
-	// start database interface
-	// influx := db.NewInfluxWithHostPort(host, port)
-	// influx.PatientId = *patientId
-	// influx.Start(event)
+func main() {
+	c := &CommandLine{}
 
-	// start scanner
-	scanner := NewScanner(vid, pid)
-	defer scanner.Close()
-	scanner.StartScan(event, influx)
+	fs := flag.NewFlagSet("default", flag.ExitOnError)
+	fs.StringVar(&c.PatientId, "patient", "", `patient id to store as measurement unit`)
+	fs.StringVar(&c.PatientId, "id", "", `patient id (shorthand)`)
+	fs.StringVar(&c.VidPid, "dev", DEFAULT_DEVICE_VID_PID, `device to listen in hex format of VENDOR:PRODUCT`)
+	fs.StringVar(&c.VidPid, "d", DEFAULT_DEVICE_VID_PID, `device (shorthand)`)
+	fs.BoolVar(&c.Verbose, "v", false, "enable verbose mode")
+	fs.Parse(os.Args[1:])
+
+	if err := c.ParseOption(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fs.PrintDefaults()
+	}
+
+	// print infomation about daem
+	fmt.Printf("[Patiend ID: %s] [USB device %04X:%04X]", c.PatientId, c.Vid, c.Pid)
 
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
@@ -85,36 +76,7 @@ func main() {
 	signal.Notify(osSignal, os.Kill)
 	go func() {
 		for sig := range osSignal {
-			fmt.Println(sig.String())
-			event.SendMessage(EVENT_ALL, EVENT_MAIN_TO_EXIT)
+			fmt.Printf("Event: %s\n", sig.String())
 		}
 	}()
-
-	// manage event handle
-	for msg := range mainEvent.Pipe {
-		if msg.Status == EVENT_MAIN_TO_EXIT {
-
-			done := event.Stop()
-
-			// wait for end signal for event handler
-		wait_loop:
-			for {
-				select {
-				case <-done:
-					break wait_loop
-				case <-time.After(time.Second * 5):
-					fmt.Println("timeout 5 second")
-					break wait_loop
-				}
-			}
-			//scanner.StopScan()
-			fmt.Println("exit main application")
-			return
-		}
-	}
-}
-
-func RedirectOutput() {
-	//TODO: redirect stdout to file
-	//http://www.antonlindstrom.com/2014/11/17/capture-stdout-in-golang.html
 }
