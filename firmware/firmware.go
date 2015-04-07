@@ -18,7 +18,7 @@ type Firmware struct {
 func (t *Firmware) String() string {
 	return fmt.Sprintf("Firmware(%d)@device(%04X:%04X)", t.Id, t.Vendor, t.Product)
 }
-func NewFirmware(io IOHandle, sql SqliteHandle) (f *Firmware) {
+func NewFirmware(patientId string, io *IOHandle, sql *SqliteHandle) (f *Firmware) {
 	f.Err = fmt.Errorf("No Firmware")
 	f.Quit = make(chan bool)
 	if io.Dev == nil {
@@ -46,24 +46,17 @@ func NewFirmware(io IOHandle, sql SqliteHandle) (f *Firmware) {
 	// init firware
 	if strings.HasPrefix(vendor, "Silicon Laboratories Inc.") &&
 		strings.HasPrefix(product, "Fake Streaming 64byt") {
-
-		// setting firmware infomation
 		f.Id = 1
-
-		// setting Tag depended on USB device
-		sqlite.PatientId = c.PatientId
-		sqlite.Unit = "Celcius"
-		sqlite.ReferenceMin = 0
-		sqlite.ReferenceMax = 100
-		sqlite.Resolution = 100
-		sqlite.SamplingRate = time.Millisecond
-
-		// create new tag
-		if err := sqlite.EnableMeasurement([]string{"id", "temperature"}); err != nil {
-			f.Err = err
-		}
 	}
+	f.initFirmware(patientId, sql)
 	return
+}
+
+func (f *Firmware) initFirmware(patientId string, sql *SqliteHandle) {
+	switch f.Id {
+	case 1:
+		f.Err = initFirmwareTemperature(patientId, sql)
+	}
 }
 
 func (f *Firmware) Start() {
@@ -72,7 +65,7 @@ func (f *Firmware) Start() {
 	case 1:
 		go runFirmwareTemperature(f.InPipe, f.OutPipe)
 	default:
-		go runNoFirmware()
+		go runNoFirmware(f)
 	}
 }
 
@@ -81,7 +74,7 @@ func (f *Firmware) Stop() {
 	<-f.Quit
 }
 
-func runNoFirmware() {
+func runNoFirmware(f *Firmware) {
 	<-f.Quit
 	f.Quit <- true
 }

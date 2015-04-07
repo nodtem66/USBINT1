@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/nodtem66/usbint1"
 	"github.com/nodtem66/usbint1/db"
+	"github.com/nodtem66/usbint1/firmware"
 	"os"
 	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -100,11 +100,10 @@ func main() {
 	}
 	defer sqlite.Close()
 
-	sqlite.Start()
-
 	// start firmware
-	//firmware :=
+	_ = firmware.NewFirmware(c.PatientId, io, sqlite)
 
+	sqlite.Start()
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
