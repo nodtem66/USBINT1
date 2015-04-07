@@ -5,50 +5,61 @@ import (
 	. "github.com/nodtem66/usbint1"
 	. "github.com/nodtem66/usbint1/db"
 	"strings"
+	"time"
 )
 
 type Firmware struct {
 	Id, Vendor, Product int
 	Err                 error
-	InPipe              chan []byte
-	OutPipe             chan SqliteData
-	Quit                chan bool
+	VendorString        string
+	ProductString       string
 }
 
 func (t *Firmware) String() string {
 	return fmt.Sprintf("Firmware(%d)@device(%04X:%04X)", t.Id, t.Vendor, t.Product)
 }
-func NewFirmware(patientId string, io *IOHandle, sql *SqliteHandle) error {
-	//f = &Firmware{Err: fmt.Errorf("No Firmware")}
-	//f.Quit = make(chan bool)
+func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
+	f := &Firmware{Err: fmt.Errorf("No Firmware")}
+
 	if io.Dev == nil {
-		return fmt.Errorf("No Firmware")
+		return f
+	}
+	if io.Dev.OpenErr != nil {
+		return f
 	}
 	vendor, err := io.Dev.Device.GetStringDescriptor(1)
 	if err != nil {
-		//f.Err = err
-		return err
+		f.Err = err
+		return f
 	}
 	product, err := io.Dev.Device.GetStringDescriptor(2)
 	if err != nil {
-		//f.Err = err
-		return err
+		f.Err = err
+		return f
 	}
-
-	// set pipe
-	f.InPipe = io.Pipe
-	f.OutPipe = sql.Pipe
 
 	// set vid pid
 	f.Vendor = int(io.Dev.Device.Vendor)
 	f.Product = int(io.Dev.Device.Product)
+	f.VendorString = vendor
+	f.ProductString = product
 
-	// init firware
-	err := fmt.Errorf("Cannot init firmware")
+	// init firmware
 	if strings.HasPrefix(vendor, "Silicon Laboratories Inc.") &&
 		strings.HasPrefix(product, "Fake Streaming 64byt") {
 		f.Id = 1
-		err = initFirmwareTemperature(patientId, sql)
+		// setting Tag depended on USB device
+		sqlite.Unit = "Celcius"
+		sqlite.ReferenceMin = 0
+		sqlite.ReferenceMax = 100
+		sqlite.Resolution = 100
+		sqlite.SamplingRate = time.Millisecond
+
+		// create new tag
+		f.Err = sqlite.EnableMeasurement([]string{"id", "temperature"})
 	}
-	return err
+	if f.Id == 0 {
+		f.Err = fmt.Errorf("No Firmware")
+	}
+	return f
 }

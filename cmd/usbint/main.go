@@ -96,7 +96,6 @@ func main() {
 	// init sqlite
 	sqlite := db.NewSqliteHandle()
 	sqlite.PatientId = c.PatientId
-
 	if c.NewDB {
 		if err := sqlite.ConnectNew(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -110,7 +109,7 @@ func main() {
 	}
 
 	// start firmware
-	f := firmware.NewFirmware(c.PatientId, io, sqlite)
+	f := firmware.NewFirmware(io, sqlite)
 
 	//start all services
 	sqlite.Start()

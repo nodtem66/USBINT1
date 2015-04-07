@@ -16,7 +16,7 @@ type IOHandle struct {
 	PacketRead int64
 	PacketPipe int64
 	Quit       chan bool
-	Pipe       chan []byte
+	Pipe       chan []int64
 	Dev        *DeviceHandle
 }
 type DeviceHandle struct {
@@ -31,7 +31,6 @@ type DeviceHandle struct {
 func NewIOHandle() *IOHandle {
 	io := &IOHandle{
 		Quit: make(chan bool),
-		Pipe: make(chan []byte, LENGTH_PIPE),
 		Dev:  &DeviceHandle{OpenErr: usb.ERROR_NO_DEVICE},
 	}
 	return io
@@ -74,7 +73,19 @@ func (i *DeviceHandle) OpenDevice(vid, pid int) {
 	i.EpAddr = int(ep.Address)
 	i.Endpoint, i.OpenErr = i.Device.OpenEndpoint(1, 0, 0, ep.Address)
 }
-func (i *IOHandle) Start() {
+
+// SetPipe()
+// set the sqlite input pipe
+func (i *IOHandle) SetPipe(pipe chan []int64) {
+	i.Pipe = pipe
+}
+
+// Start()
+// parameters:
+//   id: firmware id to select the USB data byte
+// return:
+//   none
+func (i *IOHandle) Start(id int) {
 
 	// start timer
 	fmt.Printf("[IO Start at %s]\n", time.Now())
@@ -82,12 +93,14 @@ func (i *IOHandle) Start() {
 
 	// main routine
 	if i.Dev != nil && i.Dev.OpenErr == nil {
-		go i.runReader(i.Dev.Endpoint)
+		go i.runReader(id)
 	} else {
 		go i.runWaiter()
 	}
 }
 
+// Stop()
+// stop the routine
 func (i *IOHandle) Stop() {
 	// send shutdown signal
 	i.Quit <- true
@@ -103,12 +116,14 @@ func (i *IOHandle) Stop() {
 	}
 }
 
-func (i *IOHandle) runReader(endpoint usb.Endpoint) {
+func (i *IOHandle) runReader(id int) {
+
+	// prepare buffer
+	endpoint := i.Dev.Endpoint
+	buffer := make([]byte, i.Dev.maxSize)
+
 	// main loop
 	for i.Pipe != nil {
-
-		// prepare buffer
-		buffer := make([]byte, i.Dev.maxSize)
 
 		// read
 		_, err := endpoint.Read(buffer)
@@ -117,8 +132,19 @@ func (i *IOHandle) runReader(endpoint usb.Endpoint) {
 		}
 		i.PacketRead++
 
+		// parse buffer depended on firmware id
+		var data []int64
+		switch id {
+		case 1:
+			data = []int64{int64(buffer[1]), int64(buffer[0])}
+		default:
+			data = []int64{}
+		}
+
+		// send the data
 		select {
-		case i.Pipe <- buffer:
+		case i.Pipe <- data:
+			//counting the sending data for checking data loss
 			i.PacketPipe++
 		case <-i.Quit:
 			i.Quit <- true

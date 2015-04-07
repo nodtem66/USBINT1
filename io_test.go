@@ -7,13 +7,13 @@ import (
 
 func TestIO_StartStop(t *testing.T) {
 	io := NewIOHandle()
-	io.Start()
+	io.Start(0)
 	io.Stop()
 }
 func Test_Libusb(t *testing.T) {
 	io := NewIOHandle()
 	io.Dev.OpenDevice(0x10C4, 0x8846)
-	if io.Dev == nil {
+	if io.Dev.OpenErr != nil {
 		t.Fatal("No device")
 	}
 	t.Logf("Endpoint 0x%02X [%d]\n", io.Dev.EpAddr, io.Dev.maxSize)
@@ -31,9 +31,10 @@ func Test_Libusb(t *testing.T) {
 
 func TestIO_OpenDevice(t *testing.T) {
 	io := NewIOHandle()
-
+	pipe := make(chan []int64, 1024)
+	io.SetPipe(pipe)
 	io.Dev.OpenDevice(0x10C4, 0x8846)
-	if io.Dev == nil {
+	if io.Dev.OpenErr != nil {
 		t.Fatal("No Open device")
 	} else {
 		t.Logf("Endpoint 0x%02X [%d]\n", io.Dev.EpAddr, io.Dev.maxSize)
@@ -45,7 +46,7 @@ func TestIO_OpenDevice(t *testing.T) {
 		}
 	}()
 
-	io.Start()
+	io.Start(1)
 	defer io.Stop()
 	time.Sleep(time.Second)
 

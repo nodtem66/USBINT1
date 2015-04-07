@@ -64,7 +64,7 @@ type SqliteHandle struct {
 	Connection   *sql.DB
 	EventChannel *EventSubscriptor
 	IdTag        int64
-	Pipe         chan SqliteData
+	Pipe         chan []int64
 	Quit         chan bool
 	TimeStamp    time.Time
 	DataTag
@@ -79,7 +79,7 @@ func NewSqliteHandle() *SqliteHandle {
 			SamplingRate: time.Millisecond,
 		},
 		EventChannel: NewEventSubcriptor(),
-		Pipe:         make(chan SqliteData, LENGTH_QUEUE),
+		Pipe:         make(chan []int64, LENGTH_QUEUE),
 		Quit:         make(chan bool),
 	}
 	return sqlite
@@ -316,7 +316,7 @@ func (s *SqliteHandle) Stop() {
 	<-s.Quit
 }
 
-func (s *SqliteHandle) Send(data SqliteData) {
+func (s *SqliteHandle) Send(data []int64) {
 	s.Pipe <- data
 }
 

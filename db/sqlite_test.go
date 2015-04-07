@@ -222,7 +222,7 @@ func TestSqlite_Send(t *testing.T) {
 	}
 	sqlite.Start()
 	//event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
-	sqlite.Send(SqliteData{1, 2, 3})
+	sqlite.Send([]int64{1, 2, 3})
 
 	//event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	//wait := event.Stop()
@@ -259,12 +259,12 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 	}
 	sqlite.Start()
 	event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
-	sqlite.Pipe <- SqliteData{1}
-	sqlite.Pipe <- SqliteData{2}
-	sqlite.Pipe <- SqliteData{3}
-	sqlite.Pipe <- SqliteData{4}
-	sqlite.Pipe <- SqliteData{5}
-	sqlite.Pipe <- SqliteData{1024}
+	sqlite.Pipe <- []int64{1}
+	sqlite.Pipe <- []int64{2}
+	sqlite.Pipe <- []int64{3}
+	sqlite.Pipe <- []int64{4}
+	sqlite.Pipe <- []int64{5}
+	sqlite.Pipe <- []int64{1024}
 
 	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	wait := event.Stop()
