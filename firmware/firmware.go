@@ -1,59 +1,87 @@
 package firmware
 
 import (
-	"github.com/kylelemons/gousb/usb"
-	"github.com/nodtem66/usbint1/db"
-	"github.com/nodtem66/usbint1/event"
+	"fmt"
+	. "github.com/nodtem66/usbint1"
+	. "github.com/nodtem66/usbint1/db"
+	"strings"
 )
 
-type FirmwareId int
-type FirmwareAcceptFunc func(string, string, *usb.Descriptor) bool
-type FirmwareInitFunc func(*usb.Device) Firmware
-
-// List of all support firmware
-// Define your firmware with following step
-// 1. define your firmware name `$NAME' after FIRMWARE_$YOURNAME
-//    this is your firmware id `$ID'
-// 2. define your struct in new .go file within the `firmware' package
-//    this struct have to implement Firmware interface
-// 3. define the device selection function in FirmwareAcceptFuncMap
-//    this is a map $ID to your function name
-// 4. define initial function in FirmwareInitFuncMap
-//    this is a map $ID to your function name
-const (
-	FIRMWARE_NO_FOUND FirmwareId = iota
-	FIRMWARE_TEMPERATURE_EP3_INT64
-)
-
-var FirmwareAcceptFuncMap = map[FirmwareId]FirmwareAcceptFunc{
-	FIRMWARE_TEMPERATURE_EP3_INT64: TemperatureEP3Int64AcceptFunc,
+type Firmware struct {
+	Id, Vendor, Product int
+	Err                 error
+	InPipe              chan []byte
+	OutPipe             chan SqliteData
+	Quit                chan bool
 }
 
-var FirmwareInitFuncMap = map[FirmwareId]FirmwareInitFunc{
-	FIRMWARE_TEMPERATURE_EP3_INT64: TemperatureEP3Int64InitFunc,
+func (t *Firmware) String() string {
+	return fmt.Sprintf("Firmware(%d)@device(%04X:%04X)", t.Id, t.Vendor, t.Product)
 }
+func NewFirmware(io IOHandle, sql SqliteHandle) (f *Firmware) {
+	f.Err = fmt.Errorf("No Firmware")
+	f.Quit = make(chan bool)
+	if io.Dev == nil {
+		return
+	}
+	vendor, err := io.Dev.Device.GetStringDescriptor(1)
+	if err != nil {
+		f.Err = err
+		return
+	}
+	product, err := io.Dev.Device.GetStringDescriptor(2)
+	if err != nil {
+		f.Err = err
+		return
+	}
 
-type Firmware interface {
-	// This IOLoop will run under scanner with a selected device.
-	// Inside this function, you freely code any possible task:
-	// from open usb with your prefer endpoint, select the wrapper
-	// and send to database
-	// NOTE: this function have to start loop with goroutine
-	IOLoop(*event.EventHandler, *db.InfluxHandle) error
-	// return $ID for open wrapper interface
-	GetFirmwareId() FirmwareId
-}
+	// set pipe
+	f.InPipe = io.Pipe
+	f.OutPipe = sql.Pipe
 
-func NewFirmware(dev *usb.Device) Firmware {
+	// set vid pid
+	f.Vendor = int(io.Dev.Device.Vendor)
+	f.Product = int(io.Dev.Device.Product)
 
-	vendor, _ := dev.GetStringDescriptor(1)
-	product, _ := dev.GetStringDescriptor(2)
-	desc := dev.Descriptor
+	// init firware
+	if strings.HasPrefix(vendor, "Silicon Laboratories Inc.") &&
+		strings.HasPrefix(product, "Fake Streaming 64byt") {
 
-	for id, accept := range FirmwareAcceptFuncMap {
-		if accept(vendor, product, desc) {
-			return FirmwareInitFuncMap[id](dev)
+		// setting firmware infomation
+		f.Id = 1
+
+		// setting Tag depended on USB device
+		sqlite.PatientId = c.PatientId
+		sqlite.Unit = "Celcius"
+		sqlite.ReferenceMin = 0
+		sqlite.ReferenceMax = 100
+		sqlite.Resolution = 100
+		sqlite.SamplingRate = time.Millisecond
+
+		// create new tag
+		if err := sqlite.EnableMeasurement([]string{"id", "temperature"}); err != nil {
+			f.Err = err
 		}
 	}
-	return nil
+	return
+}
+
+func (f *Firmware) Start() {
+	//TODO: separate firmware
+	switch f.Id {
+	case 1:
+		go runFirmwareTemperature(f.InPipe, f.OutPipe)
+	default:
+		go runNoFirmware()
+	}
+}
+
+func (f *Firmware) Stop() {
+	f.Quit <- true
+	<-f.Quit
+}
+
+func runNoFirmware() {
+	<-f.Quit
+	f.Quit <- true
 }

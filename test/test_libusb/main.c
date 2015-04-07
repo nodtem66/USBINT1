@@ -76,7 +76,7 @@ static void scan_devices()
 //------------------------------------------------------------------------------
 static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 {
-	//uint16_t i, len = 0;
+	uint16_t i, len = 0;
 	//counter++;
 	
 	if (xfr->status != LIBUSB_TRANSFER_COMPLETED) 
@@ -85,17 +85,18 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 		libusb_free_transfer(xfr);
 		exit(3);
 	}
-	/*
+	/*/
 	printf("[%d] XFR length: %u, actual_length: %u\n",
 		counter,
 		xfr->length,
 		xfr->actual_length);
-	
+	//*/
 	for (i=0, len=xfr->actual_length; i<len; i++)
 	{
 		printf("%02d ", xfr->buffer[i]);
 	}
-	printf("\n");*/
+	printf("\n");
+	/*/
 	gettimeofday(&tv, &tz);
 	secTime = tv.tv_sec - prev_tv.tv_sec;
 	if (secTime > 0)
@@ -105,6 +106,7 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 		printf("%ld ", tv.tv_usec - prev_tv.tv_usec);
 	}
 	gettimeofday(&prev_tv, &tz);
+	//*/
 	if (libusb_submit_transfer(xfr) < 0)
 	{
 		printf("Error re-submmit transfer\n");

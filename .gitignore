@@ -1,5 +1,5 @@
-.codelite/*
-.clang/*
+*/.codelite/*
+*/.clang/*
 *.o
 *.d
 *.exe

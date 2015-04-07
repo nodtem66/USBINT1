@@ -3,10 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/nodtem66/usbint1"
+	"github.com/nodtem66/usbint1/db"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -26,6 +30,13 @@ func (c *CommandLine) ParseOption() (err error) {
 	// check there is patientID
 	if len(c.PatientId) == 0 {
 		err = fmt.Errorf("`%s` is not a valid patient id", c.PatientId)
+		return
+	}
+	var match bool
+	if match, err = regexp.MatchString("^[0-9a-zA-Z]+$", c.PatientId); match != true {
+		if err == nil {
+			err = fmt.Errorf("`%s` is not a valid patien id", c.PatientId)
+		}
 		return
 	}
 
@@ -65,10 +76,34 @@ func main() {
 	if err := c.ParseOption(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fs.PrintDefaults()
+		return
 	}
 
 	// print infomation about daem
 	fmt.Printf("[Patiend ID: %s] [USB device %04X:%04X]", c.PatientId, c.Vid, c.Pid)
+
+	// start io
+	io := usbint.NewIOHandle()
+	io.Dev.OpenDevice(c.Vid, c.Pid)
+	if io.Dev == nil {
+		fmt.Fprintln(os.Stderr, "No devices")
+		return
+	}
+	io.Start()
+
+	// init sqlite
+	sqlite := db.NewSqliteHandle()
+	if err := sqlite.Connect(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		io.Stop()
+		return
+	}
+	defer sqlite.Close()
+
+	sqlite.Start()
+
+	// start firmware
+	//firmware :=
 
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
@@ -78,8 +113,12 @@ func main() {
 	go func() {
 		for sig := range osSignal {
 			fmt.Printf("Event: %s\n", sig.String())
+			io.Stop()
+			sqlite.Stop()
 			done <- true
 		}
 	}()
+
+	// wait for interrupt
 	<-done
 }

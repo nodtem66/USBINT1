@@ -61,11 +61,11 @@ import (
 
 type SqliteData []int64
 type SqliteHandle struct {
-	connection   *sql.DB
-	Done         chan struct{}
+	Connection   *sql.DB
 	EventChannel *EventSubscriptor
 	IdTag        int64
 	Pipe         chan SqliteData
+	Quit         chan bool
 	TimeStamp    time.Time
 	DataTag
 }
@@ -80,21 +80,20 @@ func NewSqliteHandle() *SqliteHandle {
 		},
 		EventChannel: NewEventSubcriptor(),
 		Pipe:         make(chan SqliteData, LENGTH_QUEUE),
-		Done:         make(chan struct{}, 1),
+		Quit:         make(chan bool),
 	}
 	return sqlite
 }
 
-func (s *SqliteHandle) Connect() error {
+func (s *SqliteHandle) Connect() (err error) {
 
 	// set the database name according to patientId
 	database_name := "./" + s.PatientId + ".db"
-	conn, err := sql.Open("sqlite3", database_name)
+	s.Connection, err = sql.Open("sqlite3", database_name)
 	if err != nil {
 		return err
 	}
-	s.connection = conn
-	if err := s.CreateTagTable(); err != nil {
+	if err = s.CreateTagTable(); err != nil {
 		return err
 	}
 	return nil
@@ -143,7 +142,7 @@ func (s *SqliteHandle) CreateTagTable() error {
 	descriptor TEXT NOT NULL,
 	active INTEGER DEFAULT 0);`
 
-	if _, err := s.connection.Exec(tagTableStmt); err != nil {
+	if _, err := s.Connection.Exec(tagTableStmt); err != nil {
 		return err
 	}
 
@@ -153,7 +152,7 @@ func (s *SqliteHandle) CreateTagTable() error {
 /* EnableMeasurement enable the current measurement with tagId and descriptor
  * Param: DescriptionType
  * Example:
- * EnableMeasurement(DescriptorType{"LEAD_I", "LEAD_II"})
+ * EnableMeasurement([]string{"LEAD_I", "LEAD_II"})
  */
 func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 
@@ -174,7 +173,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 	updateMeasurementStmt := `UPDATE tag SET active = 1 WHERE id = ?;`
 
 	// Prepare SQL statement for Search matched TagID
-	p, err := s.connection.Prepare(queryMeasurementStmt)
+	p, err := s.Connection.Prepare(queryMeasurementStmt)
 	if err != nil {
 		return err
 	}
@@ -190,7 +189,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 	switch {
 	case err == sql.ErrNoRows:
 		// Insert new measurement in table tag and enable it
-		p, err := s.connection.Prepare(insertMeasurementStmt)
+		p, err := s.Connection.Prepare(insertMeasurementStmt)
 		if err != nil {
 			return err
 		}
@@ -208,7 +207,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 		return nil
 	default:
 		// Enables measurement in table tag
-		p, err := s.connection.Prepare(updateMeasurementStmt)
+		p, err := s.Connection.Prepare(updateMeasurementStmt)
 		if err != nil {
 			return err
 		}
@@ -239,7 +238,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 	tag_id INTEGER NOT NULL,
 	value INTEGER NOT NULL,
 	PRIMARY KEY (time, channel_id, tag_id));`
-	_, err = s.connection.Exec(fmt.Sprintf(measurementTableStmt, s.Measurement, s.IdTag))
+	_, err = s.Connection.Exec(fmt.Sprintf(measurementTableStmt, s.Measurement, s.IdTag))
 	if err != nil {
 		return err
 	}
@@ -247,7 +246,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 }
 func (s *SqliteHandle) DisableMeasurement() error {
 	updateMeasurementStmt := `UPDATE tag SET active = 0 WHERE id = ?;`
-	p, err := s.connection.Prepare(updateMeasurementStmt)
+	p, err := s.Connection.Prepare(updateMeasurementStmt)
 	if err != nil {
 		return err
 	}
@@ -258,10 +257,8 @@ func (s *SqliteHandle) DisableMeasurement() error {
 	return nil
 }
 
+// Must be start after EnableMeasurement
 func (s *SqliteHandle) Start() {
-
-	// Subcribe the event boardcast
-	//e.Subcribe(EVENT_DATABASE, s.EventChannel)
 
 	// create SQL insertion
 	insertStmt := `INSERT INTO %s_%d (time, channel_id, tag_id, value) VALUES (?,?,?,?);`
@@ -269,30 +266,36 @@ func (s *SqliteHandle) Start() {
 
 	// main routine
 	go func() {
+
+		// main loop
 		for data := range s.Pipe {
-			isTimeout := time.Now().Sub(s.TimeStamp) > s.SamplingRate*2
-			if isTimeout {
-				s.TimeStamp = time.Now()
-			}
-			// Begin transaction
-			tx, err := s.connection.Begin()
+
+			// Transaction
+			tx, err := s.Connection.Begin()
 			if err != nil {
-				fmt.Printf("ERROR %s\n", err)
+				fmt.Println("Err: ", err)
 			}
 			stmt, err := tx.Prepare(insertStmt)
 			if err != nil {
-				fmt.Printf("ERROR %s\n", err)
+				fmt.Println("Err: ", err)
 			}
-			defer stmt.Close()
+
+			// Reset timeout
+			isTimeout := time.Now().Sub(s.TimeStamp) > s.SamplingRate*5
+			if isTimeout {
+				s.TimeStamp = time.Now()
+			}
 			for i, d := range data {
 				if _, err := stmt.Exec(s.TimeStamp.UnixNano(), i, s.IdTag, d); err != nil {
 					fmt.Printf("ERROR %s\n", err)
 				}
 			}
 			s.TimeStamp = s.TimeStamp.Add(s.SamplingRate)
-			// Commit transaction
-			tx.Commit()
+			if err := tx.Commit(); err != nil {
+				fmt.Println("Err: ", err)
+			}
 		}
+		s.Quit <- true
 	}()
 
 	// event routine
@@ -307,38 +310,17 @@ func (s *SqliteHandle) Start() {
 }
 
 func (s *SqliteHandle) Stop() {
-	s.Done <- struct{}{}
-	if !isClosed(s.Pipe) {
-		close(s.Pipe)
-	}
-}
-
-func (s *SqliteHandle) nullPipe() {
+	close(s.Pipe)
+	<-s.Quit
 }
 
 func (s *SqliteHandle) Send(data SqliteData) {
-	if !isClosed(s.Pipe) {
-		s.Pipe <- data
-	} else {
-		fmt.Printf("Sqlite Pipe is not active\n")
-	}
+	s.Pipe <- data
 }
 
 func (s *SqliteHandle) Close() {
 	if err := s.DisableMeasurement(); err != nil {
 		fmt.Printf("%s", err)
 	}
-	s.connection.Close()
-}
-
-// Chan is it whether it is seen cool utility function if they were Close
-func isClosed(ch chan SqliteData) bool {
-	var OK bool
-	select {
-	case _, OK = <-ch:
-	default:
-		OK = true // living!
-	}
-
-	return !OK
+	s.Connection.Close()
 }

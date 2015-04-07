@@ -19,7 +19,7 @@ func TestSqlite_Connect(t *testing.T) {
 	}
 
 	var b int
-	err := sqlite.connection.QueryRow(`SELECT active FROM tag WHERE mnt='` + sqlite.Measurement + `';`).Scan(&b)
+	err := sqlite.Connection.QueryRow(`SELECT active FROM tag WHERE mnt='` + sqlite.Measurement + `';`).Scan(&b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestSqlite_Connect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = sqlite.connection.QueryRow(`SELECT active FROM tag WHERE mnt='` + sqlite.Measurement + `';`).Scan(&b)
+	err = sqlite.Connection.QueryRow(`SELECT active FROM tag WHERE mnt='` + sqlite.Measurement + `';`).Scan(&b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,11 +59,11 @@ func TestSqlite_CreateTable(t *testing.T) {
 	querySqlStmt := `SELECT * FROM test LIMIT 10;`
 
 	// create a table
-	if _, err := sqlite.connection.Exec(createSqlStmt); err != nil {
+	if _, err := sqlite.Connection.Exec(createSqlStmt); err != nil {
 		t.Fatal(err)
 	}
 	// insert the data
-	stmt, err := sqlite.connection.Prepare(insertSqlStmt)
+	stmt, err := sqlite.Connection.Prepare(insertSqlStmt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestSqlite_CreateTable(t *testing.T) {
 	}
 	stmt.Close()
 	// query the data
-	rows, err := sqlite.connection.Query(querySqlStmt)
+	rows, err := sqlite.Connection.Query(querySqlStmt)
 	defer rows.Close()
 	for rows.Next() {
 		var name string
@@ -105,7 +105,7 @@ func TestSqlite_NewMeasurementTable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rows, err := sqlite.connection.Query(`SELECT name FROM sqlite_master WHERE type='table';`)
+	rows, err := sqlite.Connection.Query(`SELECT name FROM sqlite_master WHERE type='table';`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestSqlite_EnableMeasurement(t *testing.T) {
 	}
 	sqlite.EnableMeasurement(names)
 
-	p, err := sqlite.connection.Prepare(`SELECT descriptor FROM tag WHERE id = ?`)
+	p, err := sqlite.Connection.Prepare(`SELECT descriptor FROM tag WHERE id = ?`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +173,12 @@ func TestSqlite_EnableMeasurement(t *testing.T) {
 func TestSqlite_StartStop(t *testing.T) {
 	sqlite := NewSqliteHandle()
 	sqlite.PatientId = "T001"
+	if err := sqlite.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(sqlite.PatientId + ".db")
+	defer sqlite.Close()
+	sqlite.EnableMeasurement([]string{"id", "temperature"})
 	sqlite.Start()
 	sqlite.Stop()
 }
@@ -215,14 +221,15 @@ func TestSqlite_Send(t *testing.T) {
 		t.Fatal(err)
 	}
 	sqlite.Start()
-	event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
+	//event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
 	sqlite.Send(SqliteData{1, 2, 3})
 
-	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
-	wait := event.Stop()
-	<-wait
+	//event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
+	//wait := event.Stop()
+	//<-wait
+	sqlite.Stop()
 
-	rows, err := sqlite.connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
+	rows, err := sqlite.Connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +259,26 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 	}
 	sqlite.Start()
 	event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
+	sqlite.Pipe <- SqliteData{1}
+	sqlite.Pipe <- SqliteData{2}
+	sqlite.Pipe <- SqliteData{3}
+	sqlite.Pipe <- SqliteData{4}
+	sqlite.Pipe <- SqliteData{5}
+	sqlite.Pipe <- SqliteData{1024}
+
 	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
 	wait := event.Stop()
 	<-wait
+
+	rows, err := sqlite.Connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n, time, c, tid int
+		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("[%d|%d:%d] %d\n", time, tid, c, n)
+	}
 }
