@@ -206,8 +206,8 @@ func TestSqlite_StartStopWithEventManager(t *testing.T) {
 }
 
 func TestSqlite_Send(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
+	//event := NewEventHandler()
+	//event.Start()
 
 	sqlite := NewSqliteHandle()
 	sqlite.PatientId = "T001"

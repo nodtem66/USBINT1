@@ -23,6 +23,7 @@ type CommandLine struct {
 	VidPid    string
 	PatientId string
 	Verbose   bool
+	NewDB     bool
 }
 
 func (c *CommandLine) ParseOption() (err error) {
@@ -71,6 +72,7 @@ func main() {
 	fs.StringVar(&c.VidPid, "dev", DEFAULT_DEVICE_VID_PID, `device to listen in hex format of VENDOR:PRODUCT`)
 	fs.StringVar(&c.VidPid, "d", DEFAULT_DEVICE_VID_PID, `device (shorthand)`)
 	fs.BoolVar(&c.Verbose, "v", false, "enable verbose mode")
+	fs.BoolVar(&c.NewDB, "n", false, "new sqlite database file")
 	fs.Parse(os.Args[1:])
 
 	if err := c.ParseOption(); err != nil {
@@ -80,30 +82,39 @@ func main() {
 	}
 
 	// print infomation about daem
-	fmt.Printf("[Patiend ID: %s] [USB device %04X:%04X]", c.PatientId, c.Vid, c.Pid)
+	fmt.Printf("[Patiend ID: %s] [USB device %04X:%04X]\n", c.PatientId, c.Vid, c.Pid)
 
 	// start io
+
 	io := usbint.NewIOHandle()
 	io.Dev.OpenDevice(c.Vid, c.Pid)
-	if io.Dev == nil {
+	if io.Dev.OpenErr != nil {
 		fmt.Fprintln(os.Stderr, "No devices")
 		return
 	}
-	io.Start()
 
 	// init sqlite
 	sqlite := db.NewSqliteHandle()
-	if err := sqlite.Connect(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		io.Stop()
-		return
+	sqlite.PatientId = c.PatientId
+
+	if c.NewDB {
+		if err := sqlite.ConnectNew(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+	} else {
+		if err := sqlite.Connect(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
 	}
-	defer sqlite.Close()
 
 	// start firmware
-	_ = firmware.NewFirmware(c.PatientId, io, sqlite)
+	f := firmware.NewFirmware(c.PatientId, io, sqlite)
 
+	//start all services
 	sqlite.Start()
+	io.Start()
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
@@ -113,11 +124,13 @@ func main() {
 		for sig := range osSignal {
 			fmt.Printf("Event: %s\n", sig.String())
 			io.Stop()
-			sqlite.Stop()
 			done <- true
 		}
 	}()
 
 	// wait for interrupt
 	<-done
+	// save database
+	sqlite.Stop()
+	sqlite.Close()
 }

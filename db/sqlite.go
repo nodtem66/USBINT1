@@ -93,9 +93,11 @@ func (s *SqliteHandle) Connect() (err error) {
 	if err != nil {
 		return err
 	}
+
 	if err = s.CreateTagTable(); err != nil {
 		return err
 	}
+
 	return nil
 }
 func (s *SqliteHandle) ConnectNew() error {

@@ -21,8 +21,3 @@ func initFirmwareTemperature(patientId string, sqlite *SqliteHandle) (err error)
 	err = sqlite.EnableMeasurement([]string{"id", "temperature"})
 	return
 }
-func runFirmwareTemperature(in chan []byte, out chan SqliteData) {
-	for data := range in {
-		out <- SqliteData{int64(data[1]), int64(data[0])}
-	}
-}

@@ -1,6 +1,8 @@
 package main
 
 import (
+	. "github.com/nodtem66/usbint1"
+	. "github.com/nodtem66/usbint1/db"
 	"testing"
 )
 
@@ -136,5 +138,19 @@ func TestMain_CommandLine(t *testing.T) {
 	c.PatientId = "ewqwe/qwe"
 	if err := c.ParseOption(); err == nil {
 		t.Fatal("This is not valid ", c)
+	}
+}
+
+func TestMain_Integrate(t *testing.T) {
+	io := NewIOHandle()
+	io.Dev.OpenDevice(0x10C4, 0x8846)
+	if io.Dev.OpenErr != nil {
+		t.Fatal(io.Dev.OpenErr)
+	}
+
+	sqlite := NewSqliteHandle()
+	sqlite.PatientId = "T100"
+	if err := sqlite.ConnectNew(); err != nil {
+		t.Fatal(err)
 	}
 }
