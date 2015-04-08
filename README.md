@@ -1,19 +1,31 @@
 # USBINT1
-USB firmware in #golang for ARM6 (Raspberry Pi)
+USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://github.com/nodtem66/USBINT1-C8051F380)
+
+## Test OS
+* ARM6 (Raspberry Pi)
 
 ## Directory
 * `cmd`:
-  command line program to run daemon
-* `config`:
-  the set of config file and its reader
+  command line programs to run daemon
 * `test`: 
   The collection of simple program to prove the proper protocol instruction.
 * `firmware`:
-  the set of firmwares and loader. Firmware is read the data from USB and send to `wrapper`
-* `wrapper`:
-  the set of wrapper and loader. Wrapper is wrap the streaming data from the firmware and send to `db` 
+  the set of firmwares and loader.
 * `db`:
   the set of databases and loader. the database is endpoint to finish the steaming data
+  the current db engine is sqlite3
+
+## Commands in `cmd`
+* `usbint`:
+   command line program to run daemon with target vid, pid, and patient id
+* `usbtest`:
+   command line to test `kylelemons/gousb`
+* `usbapi`:
+   command line to run webserver, serving the sqlite3 db with RESTful api
+
+## Bugs
+*  Exception 0xC0000005 on Window7 64bit
+   see go-sqlite3 tickets: [mattn/go-sqlite3#163](https://github.com/mattn/go-sqlite3/issues/163) [golang/go#9356](https://github.com/golang/go/issues/9356) 
 
 ## Test (interrupt with libusb implemented with C)
 * open test/usbint1.workspace with [Codelite](http://codelite.org/) 

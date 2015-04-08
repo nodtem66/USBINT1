@@ -16,8 +16,10 @@ func Test_Libusb(t *testing.T) {
 	if io.Dev.OpenErr != nil {
 		t.Fatal("No device")
 	}
+	defer io.Dev.Context.Close()
 	t.Logf("Endpoint 0x%02X [%d]\n", io.Dev.EpAddr, io.Dev.maxSize)
 	ep, err := io.Dev.Device.OpenEndpoint(1, 0, 0, 0x83)
+	defer io.Dev.Device.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +37,7 @@ func TestIO_OpenDevice(t *testing.T) {
 	io.SetPipe(pipe)
 	io.Dev.OpenDevice(0x10C4, 0x8846)
 	if io.Dev.OpenErr != nil {
-		t.Fatal("No Open device")
+		t.Fatal(io.Dev.OpenErr)
 	} else {
 		t.Logf("Endpoint 0x%02X [%d]\n", io.Dev.EpAddr, io.Dev.maxSize)
 	}
@@ -47,7 +49,6 @@ func TestIO_OpenDevice(t *testing.T) {
 	}()
 
 	io.Start(1)
-	defer io.Stop()
 	time.Sleep(time.Second)
-
+	io.Stop()
 }

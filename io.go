@@ -15,6 +15,7 @@ type IOHandle struct {
 	StartTime  time.Time
 	PacketRead int64
 	PacketPipe int64
+	PacketErr  int64
 	Quit       chan bool
 	Pipe       chan []int64
 	Dev        *DeviceHandle
@@ -107,7 +108,8 @@ func (i *IOHandle) Stop() {
 	<-i.Quit
 	// stop timer
 	totalSec := time.Now().Sub(i.StartTime).Seconds()
-	fmt.Printf("[IO Stop] [Running Time %f sec] [Read %d Loss %d]\n", totalSec, i.PacketRead, i.PacketRead-i.PacketPipe)
+	fmt.Printf("[IO Stop] [Running Time %f sec] [Read %d Loss %d Err %d]\n",
+		totalSec, i.PacketRead, i.PacketRead-i.PacketPipe, i.PacketErr)
 	// check the device is opened
 	if i.Dev != nil && i.Dev.OpenErr == nil {
 		// then close all connection
@@ -123,16 +125,20 @@ func (i *IOHandle) runReader(id int) {
 	buffer := make([]byte, i.Dev.maxSize)
 
 	// main loop
+main_loop:
 	for i.Pipe != nil {
 
 		// read
 		_, err := endpoint.Read(buffer)
 		if err != nil {
-			fmt.Printf("Error: %s\n", err)
+			//fmt.Printf("Error: %s\n", err)
+			i.PacketErr++
+			continue main_loop
 		}
 		i.PacketRead++
 
 		// parse buffer depended on firmware id
+
 		var data []int64
 		switch id {
 		case 1:
