@@ -1,0 +1,15 @@
+# This is TOML Configuration
+
+[device]
+name = "VirtualDevice"
+organization = "Developer"
+description = "A Virtual Device for development"
+
+[database]
+path = "../usbint/"
+
+[server]
+address = ":8000"
+
+[log]
+file = "./usbapi.log"
