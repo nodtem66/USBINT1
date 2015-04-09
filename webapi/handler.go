@@ -29,10 +29,8 @@ type Tag struct {
 	Active       bool   `json:"active"`
 }
 type Measurement struct {
-	Time      int64 `json:"time"`
-	ChannelId int64 `json:"channel_id"`
-	TagId     int64 `json:"tag_id"`
-	Value     int64 `json:"value"`
+	Time  int64 `json:"time"`
+	Value int64 `json:"value"`
 }
 type MeasurementDescriptor struct {
 	Name        string   `json:"name"`
@@ -319,7 +317,7 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 
 		// query total record and last time
 		if err := conn.QueryRow(
-			`SELECT count(_rowid_) as total, time  FROM general_1 ORDER BY time DESC LIMIT 1;`,
+			fmt.Sprintf(`SELECT count(_rowid_) as total, time  FROM %s ORDER BY time DESC LIMIT 1;`, mntId),
 		).Scan(&desc.TotalRecord, &desc.LastTime); err != nil {
 			err0 = err
 			return
@@ -333,6 +331,7 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 			err0 = err
 			return
 		}
+		// return json format for measurement unit description
 		json.Unmarshal([]byte(jsonDesc), &desc.ChannelName)
 		ret["result"] = desc
 		return
@@ -346,7 +345,47 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		//	  query the lastest 100 record before 123ns
 		// time unit: s ms us ns
 		//    1 == 1s == 1000ms == 1000000us == 1000000000ns
-
+		mql := ParseMeasurementQL(query)
+		if mql.Err != nil {
+			err0 = mql.Err
+			return
+		}
+		// prepare where statement
+		whereStmt := ""
+		if mql.After > 0 {
+			whereStmt += fmt.Sprintf(` AND time > %d`, mql.After)
+		}
+		if mql.Before > 0 {
+			whereStmt += fmt.Sprintf(` AND time < %d`, mql.Before)
+		}
+		// prepare order by statement
+		orderStmt := "DESC"
+		if !mql.OrderDESC {
+			orderStmt = "ASC"
+		}
+		// prepare total statement
+		stmt := fmt.Sprintf(`SELECT time, value FROM %s WHERE channel_id = ? %s ORDER BY time %s LIMIT %d`,
+			mntId, whereStmt, orderStmt, mql.Limit,
+		)
+		// query to rows
+		rows, err := conn.Query(stmt, mql.Channel)
+		if err != nil {
+			err0 = err
+			return
+		}
+		// enumerate rows
+		m := make([]Measurement, mql.Limit)
+		i := 0
+		for rows.Next() {
+			rows.Scan(&m[i].Time, &m[i].Value)
+			i++
+		}
+		if rows.Err() != nil {
+			err0 = rows.Err()
+			return
+		}
+		ret["result"] = m[0:i]
+		return
 	}
 }
 

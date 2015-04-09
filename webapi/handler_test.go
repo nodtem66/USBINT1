@@ -240,3 +240,32 @@ func TestWebApi_MQL(t *testing.T) {
 		}
 	}
 }
+
+func TestWebApi_MeasurementQuery(t *testing.T) {
+	globalHandler.Conf = &conf
+	router := NewAPIRouter(globalHandler)
+
+	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(404)
+	}
+	r, _ := http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	assertEqual(t, w.Body.String(), `{"result":[{"time":10112122,"value":10}]}`)
+	t.Log(w.Body)
+
+	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10&ch=1", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	assertEqual(t, w.Body.String(), `{"result":[{"time":10112123,"value":10}]}`)
+	t.Log(w.Body)
+
+	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10&ch=2", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	assertEqual(t, w.Body.String(), `{"result":[]}`)
+	t.Log(w.Body)
+}

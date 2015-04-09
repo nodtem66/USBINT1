@@ -1,4 +1,4 @@
-# USBINT1
+# USBINT1 [![Build Status](https://travis-ci.org/nodtem66/USBINT1.svg)](https://travis-ci.org/nodtem66/USBINT1) [![GoDoc](http://godoc.org/github.com/nodtem66/USBINT1?status.png)](http://godoc.org/github.com/nodtem66/USBINT1)
 USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://github.com/nodtem66/USBINT1-C8051F380)
 
 ## Test OS

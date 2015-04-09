@@ -1,6 +1,6 @@
 */.codelite/*
 */.clang/*
-*.db
+cmd/*/*.db
 *.o
 *.d
 *.exe
