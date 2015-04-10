@@ -114,7 +114,7 @@ func main() {
 	//start all services
 	sqlite.Start()
 	io.Start(f.Id)
-	io.SetPipe(sqlite.Pipe)
+	io.SetProperty(sqlite.Pipe, sqlite.SamplingRate)
 	// hook os signal
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)

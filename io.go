@@ -8,17 +8,18 @@ import (
 )
 
 const (
-	LENGTH_PIPE = 1024
+	LENGTH_PIPE = 2048
 )
 
 type IOHandle struct {
-	StartTime  time.Time
-	PacketRead int64
-	PacketPipe int64
-	PacketErr  int64
-	Quit       chan bool
-	Pipe       chan []int64
-	Dev        *DeviceHandle
+	StartTime    time.Time
+	PacketRead   int64
+	PacketPipe   int64
+	PacketErr    int64
+	Quit         chan bool
+	Pipe         chan []int64
+	Dev          *DeviceHandle
+	SamplingRate time.Duration
 }
 type DeviceHandle struct {
 	Context  *usb.Context
@@ -31,8 +32,9 @@ type DeviceHandle struct {
 
 func NewIOHandle() *IOHandle {
 	io := &IOHandle{
-		Quit: make(chan bool),
-		Dev:  &DeviceHandle{OpenErr: usb.ERROR_NO_DEVICE},
+		Quit:         make(chan bool),
+		Dev:          &DeviceHandle{OpenErr: usb.ERROR_NO_DEVICE},
+		SamplingRate: time.Millisecond,
 	}
 	return io
 }
@@ -77,8 +79,9 @@ func (i *DeviceHandle) OpenDevice(vid, pid int) {
 
 // SetPipe()
 // set the sqlite input pipe
-func (i *IOHandle) SetPipe(pipe chan []int64) {
+func (i *IOHandle) SetProperty(pipe chan []int64, d time.Duration) {
 	i.Pipe = pipe
+	i.SamplingRate = d
 }
 
 // Start()
@@ -123,6 +126,8 @@ func (i *IOHandle) runReader(id int) {
 	// prepare buffer
 	endpoint := i.Dev.Endpoint
 	buffer := make([]byte, i.Dev.maxSize)
+	// prepare timestamp
+	var timestamp time.Time
 
 	// main loop
 main_loop:
@@ -136,16 +141,19 @@ main_loop:
 			continue main_loop
 		}
 		i.PacketRead++
-
+		isTimeout := time.Now().Sub(timestamp) > i.SamplingRate*5
+		if isTimeout {
+			timestamp = time.Now()
+		}
 		// parse buffer depended on firmware id
-
 		var data []int64
 		switch id {
 		case 1:
-			data = []int64{int64(buffer[1]), int64(buffer[0])}
+			data = []int64{timestamp.UnixNano(), int64(buffer[1]), int64(buffer[0])}
 		default:
 			data = []int64{}
 		}
+		timestamp = timestamp.Add(i.SamplingRate)
 
 		// send the data
 		select {

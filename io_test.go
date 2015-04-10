@@ -34,7 +34,7 @@ func Test_Libusb(t *testing.T) {
 func TestIO_OpenDevice(t *testing.T) {
 	io := NewIOHandle()
 	pipe := make(chan []int64, 1024)
-	io.SetPipe(pipe)
+	io.SetProperty(pipe, time.Millisecond)
 	io.Dev.OpenDevice(0x10C4, 0x8846)
 	if io.Dev.OpenErr != nil {
 		t.Fatal(io.Dev.OpenErr)

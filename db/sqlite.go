@@ -56,6 +56,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/nodtem66/usbint1/event"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -66,6 +67,8 @@ type SqliteHandle struct {
 	IdTag        int64
 	Pipe         chan []int64
 	Quit         chan bool
+	WaitQuit     sync.WaitGroup
+	NumTask      int
 	TimeStamp    time.Time
 	DataTag
 }
@@ -81,6 +84,7 @@ func NewSqliteHandle() *SqliteHandle {
 		EventChannel: NewEventSubcriptor(),
 		Pipe:         make(chan []int64, LENGTH_QUEUE),
 		Quit:         make(chan bool),
+		NumTask:      1,
 	}
 	return sqlite
 }
@@ -114,7 +118,11 @@ func (s *SqliteHandle) ConnectNew() error {
 }
 
 func (s *SqliteHandle) CreateTagTable() error {
-
+	// For optmize use PRAGMA journal_mod=WAL
+	if _, err := s.Connection.Exec(`PRAGMA journal_mod=WAL`); err != nil {
+		return err
+	}
+	// For optmize use PRAGMA synchronous=NORMAL
 	/* Create table tag
 	   TAG TABLE |<-------------------TAGData ------------------------------->|
 	   --------------------------------------------------------------------------------------------------------------------
@@ -266,37 +274,50 @@ func (s *SqliteHandle) Start() {
 	insertStmt := `INSERT INTO %s_%d (time, channel_id, tag_id, value) VALUES (?,?,?,?);`
 	insertStmt = fmt.Sprintf(insertStmt, s.Measurement, s.IdTag)
 
-	// main routine
-	go func() {
+	// init worker
+	for i := 0; i < s.NumTask; i++ {
+		s.WaitQuit.Add(1)
+		// main routine
+		go func() {
 
-		// main loop
-		for data := range s.Pipe {
+			// main loop
+			for data := range s.Pipe {
 
-			// Transaction
-			tx, err := s.Connection.Begin()
-			if err != nil {
-				fmt.Println("Err: ", err)
-			}
-			stmt, err := tx.Prepare(insertStmt)
-			if err != nil {
-				fmt.Println("Err: ", err)
-			}
+				// Transaction
+				tx, err := s.Connection.Begin()
+				if err != nil {
+					fmt.Println("Err: ", err)
+				}
+				stmt, err := tx.Prepare(insertStmt)
+				if err != nil {
+					fmt.Println("Err: ", err)
+				}
 
-			// Reset timeout
-			isTimeout := time.Now().Sub(s.TimeStamp) > s.SamplingRate*5
-			if isTimeout {
-				s.TimeStamp = time.Now()
-			}
-			for i, d := range data {
-				if _, err := stmt.Exec(s.TimeStamp.UnixNano(), i, s.IdTag, d); err != nil {
-					fmt.Printf("ERROR %s\n", err)
+				// Reset timeout
+				/*
+					isTimeout := time.Now().Sub(s.TimeStamp) > s.SamplingRate*5
+					if isTimeout {
+						s.TimeStamp = time.Now()
+					}*/
+				timestamp := data[0]
+				data = data[1:]
+				for i, d := range data {
+					if _, err := stmt.Exec(timestamp, i, s.IdTag, d); err != nil {
+						fmt.Printf("ERROR %s\n", err)
+					}
+				}
+				//s.TimeStamp = s.TimeStamp.Add(s.SamplingRate)
+				if err := tx.Commit(); err != nil {
+					fmt.Println("Err: ", err)
 				}
 			}
-			s.TimeStamp = s.TimeStamp.Add(s.SamplingRate)
-			if err := tx.Commit(); err != nil {
-				fmt.Println("Err: ", err)
-			}
-		}
+			//s.Quit <- true
+			s.WaitQuit.Done()
+		}()
+	}
+
+	go func() {
+		s.WaitQuit.Wait()
 		s.Quit <- true
 	}()
 

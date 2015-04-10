@@ -282,3 +282,40 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 		t.Logf("[%d|%d:%d] %d\n", time, tid, c, n)
 	}
 }
+
+func TestSqlite_SendMultipleTask(t *testing.T) {
+	event := NewEventHandler()
+	event.Start()
+
+	sqlite := NewSqliteHandle()
+	sqlite.PatientId = "T001"
+	if err := sqlite.ConnectNew(); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(sqlite.PatientId + ".db")
+	defer sqlite.Close()
+
+	if err := sqlite.EnableMeasurement([]string{"test", "test2"}); err != nil {
+		t.Fatal(err)
+	}
+	sqlite.NumTask = 10
+	sqlite.Start()
+	var i int64
+	for i = 0; i < 1000; i++ {
+		sqlite.Pipe <- []int64{i, 1, 0}
+	}
+
+	sqlite.Stop()
+	rows, err := sqlite.Connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n, time, c, tid int64
+		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
+			t.Fatal(err)
+		}
+		//t.Logf("[%d|%d:%d] %d\n", time, tid, c, n)
+	}
+
+}
