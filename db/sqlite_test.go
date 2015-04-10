@@ -234,7 +234,7 @@ func TestSqlite_Send(t *testing.T) {
 		t.Fatal(err)
 	}
 	for rows.Next() {
-		var n, time, c, tid int
+		var n, time, c, tid int64
 		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
 			t.Fatal(err)
 		}
@@ -275,7 +275,7 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 		t.Fatal(err)
 	}
 	for rows.Next() {
-		var n, time, c, tid int
+		var n, time, c, tid int64
 		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
 			t.Fatal(err)
 		}
