@@ -77,7 +77,7 @@ static void scan_devices()
 static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 {
 	uint16_t i, len = 0;
-	//counter++;
+	
 	
 	if (xfr->status != LIBUSB_TRANSFER_COMPLETED) 
 	{
@@ -85,18 +85,19 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 		libusb_free_transfer(xfr);
 		exit(3);
 	}
+	counter++;
 	/*/
 	printf("[%d] XFR length: %u, actual_length: %u\n",
 		counter,
 		xfr->length,
 		xfr->actual_length);
-	//*/
+
 	for (i=0, len=xfr->actual_length; i<len; i++)
 	{
 		printf("%02d ", xfr->buffer[i]);
 	}
 	printf("\n");
-	/*/
+
 	gettimeofday(&tv, &tz);
 	secTime = tv.tv_sec - prev_tv.tv_sec;
 	if (secTime > 0)
@@ -106,7 +107,7 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 		printf("%ld ", tv.tv_usec - prev_tv.tv_usec);
 	}
 	gettimeofday(&prev_tv, &tz);
-	//*/
+	*/
 	if (libusb_submit_transfer(xfr) < 0)
 	{
 		printf("Error re-submmit transfer\n");
@@ -150,6 +151,7 @@ int main()
 	//init signal handler
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+	signal(SIGABRT_COMPAT, signal_handler);
 	
 	//init libusb
 	TRY("initializing libusb", libusb_init(NULL));
@@ -191,6 +193,15 @@ int main()
 	{
 		TRY("handle event", libusb_handle_events(NULL));
 	}
+	gettimeofday(&tv, &tz);
+	secTime = tv.tv_sec - prev_tv.tv_sec;
+	if (secTime > 0)
+	{
+		printf("[time %.6f s]", (secTime*1000000 + tv.tv_usec - prev_tv.tv_usec)/1e6 );
+	} else {
+		printf("[time %.6f s]", (tv.tv_usec - prev_tv.tv_usec)/1e6);
+	}
+	printf(" [count %d]\n", counter);
 	//release interface 1
 	printf("release interface 0\n");
 	libusb_release_interface(dev_handle, 0);
