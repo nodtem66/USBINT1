@@ -2,8 +2,10 @@
 */.clang
 cmd/*/*.db
 db/*.db*
-*/*/Debug
+*/*/Debug/*
+c_code/*/*.db
 *.o
 *.d
 *.exe
 *.log
+*.out
