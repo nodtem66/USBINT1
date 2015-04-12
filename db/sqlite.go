@@ -388,12 +388,12 @@ func (s *SqliteHandle) Start() {
 				}
 
 				// periodically commit when every 1000 record
-				if counter > 1000 && isBegin == true {
+				if counter >= 1000 && isBegin == true {
 
 					if _, err = conn.Exec(`COMMIT;`); err != nil {
 						fmt.Println("Err TX Commit: ", err)
 					}
-					counter -= 1000
+					counter = 0
 					isBegin = false
 
 				}
