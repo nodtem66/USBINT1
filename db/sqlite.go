@@ -47,6 +47,18 @@
  *   | 1988-09-0909  | 2    |  78909  | 1       |
  *   --------------------------------------------
  */
+
+/* Example usage:
+1. sqlite := NewSqliteHandle()
+2. sqlite.Connect()
+   or sqlite.ConnectNew()
+3. sqlite.EnableMeasurement()
+4. sqlite.Start()
+5. sqlite.Pipe <- []int64{}
+   or sqlite.Send([]int64{})
+6. sqlite.Stop()
+7. sqlite.Close()
+*/
 package db
 
 import (
@@ -56,6 +68,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/nodtem66/usbint1/event"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -65,7 +78,6 @@ type SqliteData []int64
 type SqliteHandle struct {
 	Connection   *sql.DB
 	DBName       string
-	DBTimeout    int
 	EventChannel *EventSubscriptor
 	IdTag        int64
 	Pipe         chan []int64
@@ -87,7 +99,7 @@ func NewSqliteHandle() *SqliteHandle {
 		EventChannel: NewEventSubcriptor(),
 		Pipe:         make(chan []int64, LENGTH_QUEUE),
 		Quit:         make(chan bool),
-		NumTask:      1,
+		NumTask:      runtime.NumCPU(),
 	}
 	return sqlite
 }
@@ -108,7 +120,7 @@ func (s *SqliteHandle) Connect() (err error) {
 	// | ArchLinux VirtualBox | 10000        |
 	// | Window 7 64bit       | 5000         |
 	// ---------------------------------------
-	s.DBName = fmt.Sprintf("file:%s.db?mode=rwc&_busy_timeout=10000", s.PatientId)
+	s.DBName = fmt.Sprintf("file:%s.db?mode=rwc&_busy_timeout=5000", s.PatientId)
 
 	s.Connection, err = sql.Open("sqlite3", s.DBName)
 	if err != nil {
@@ -160,7 +172,15 @@ func (s *SqliteHandle) CreateTagTable() error {
 	if _, err := s.Connection.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 		return err
 	}
+	// Disable autocheckout
+	if _, err := s.Connection.Exec(`PRAGMA wal_autocheckpoint=1000`); err != nil {
+		return err
+	}
 	// For optmize use PRAGMA synchronous=NORMAL
+	// default synchronous=FULL
+	if _, err := s.Connection.Exec(`PRAGMA synchronous=NORMAL`); err != nil {
+		return err
+	}
 	/* Create table tag
 	   TAG TABLE |<-------------------TAGData ------------------------------->|
 	   --------------------------------------------------------------------------------------------------------------------
@@ -316,8 +336,9 @@ func (s *SqliteHandle) Start() {
 	for i := 0; i < s.NumTask; i++ {
 		s.WaitQuit.Add(1)
 		// main routine
-		go func() {
+		go func(id int) {
 			defer s.WaitQuit.Done()
+
 			// create local sqlite connection
 			conn, err := sql.Open("sqlite3", s.DBName)
 			if err != nil {
@@ -326,38 +347,59 @@ func (s *SqliteHandle) Start() {
 			}
 			defer conn.Close()
 
+			// cache prepare statement for speed up
+			var stmt *sql.Stmt
+			stmt, err = conn.Prepare(insertStmt)
+			if err != nil {
+				fmt.Println("Err TX Prepare(): ", err)
+			}
+			// init counter for transaction commit
+			// init local variables
+			counter := 0
+			isBegin := false
+			var timestamp int64
+
+			defer func() {
+				if isBegin {
+					if _, err = conn.Exec(`COMMIT;`); err != nil {
+						fmt.Println("Err TX Commit: ", err)
+					}
+					//fmt.Println("END routine ", id)
+				}
+			}()
 			// main loop
 			for data := range s.Pipe {
-
-				// Transaction
-				tx, err := conn.Begin()
-				if err != nil {
-					fmt.Println("Err TX Begin(): ", err)
+				// init transaction for counter = 0
+				if isBegin == false {
+					_, err = conn.Exec(`BEGIN;`)
+					if err != nil {
+						fmt.Println("Err TX Begin(): ", err)
+					}
+					isBegin = true
 				}
-				stmt, err := tx.Prepare(insertStmt)
-				if err != nil {
-					fmt.Println("Err TX Prepare(): ", err)
-				}
-
-				// Reset timeout
-				/*
-					isTimeout := time.Now().Sub(s.TimeStamp) > s.SamplingRate*5
-					if isTimeout {
-						s.TimeStamp = time.Now()
-					}*/
-				timestamp := data[0]
+				timestamp = data[0]
 				data = data[1:]
 				for i, d := range data {
-					if _, err := stmt.Exec(timestamp, i, s.IdTag, d); err != nil {
+					if _, err = stmt.Exec(timestamp, i, s.IdTag, d); err != nil {
 						fmt.Println("Err TX Exec: ", err)
 					}
+					counter++
+
 				}
-				//s.TimeStamp = s.TimeStamp.Add(s.SamplingRate)
-				if err := tx.Commit(); err != nil {
-					fmt.Println("Err TX Commit(): ", err)
+
+				// periodically commit when every 1000 record
+				if counter > 1000 && isBegin == true {
+
+					if _, err = conn.Exec(`COMMIT;`); err != nil {
+						fmt.Println("Err TX Commit: ", err)
+					}
+					counter -= 1000
+					isBegin = false
+
 				}
 			}
-		}()
+
+		}(i)
 	}
 
 	go func() {
@@ -389,5 +431,9 @@ func (s *SqliteHandle) Close() {
 	if err := s.DisableMeasurement(); err != nil {
 		fmt.Printf("%s", err)
 	}
+	/*
+		if _, err := s.Connection.Exec(`PRAGMA wal_checkpoint(PASSIVE);`); err != nil {
+			fmt.Println("Err wal_checkpoint ", err)
+		}*/
 	s.Connection.Close()
 }
