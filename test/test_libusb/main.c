@@ -151,7 +151,6 @@ int main()
 	//init signal handler
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
-	signal(SIGABRT_COMPAT, signal_handler);
 	
 	//init libusb
 	TRY("initializing libusb", libusb_init(NULL));
