@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Workspace Name="usbint1" Database="">
+  <Project Name="test_libusb" Path="test_libusb/test_libusb.project" Active="No"/>
+  <Project Name="test_sqlite3" Path="test_sqlite3/test_sqlite3.project" Active="Yes"/>
+  <BuildMatrix>
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
+      <Project Name="test_libusb" ConfigName="Debug"/>
+      <Project Name="test_sqlite3" ConfigName="Debug"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Project Name="test_libusb" ConfigName="Release"/>
+      <Project Name="test_sqlite3" ConfigName="Release"/>
+    </WorkspaceConfiguration>
+  </BuildMatrix>
+</CodeLite_Workspace>
