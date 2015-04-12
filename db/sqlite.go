@@ -295,19 +295,27 @@ func (s *SqliteHandle) Start() {
 	// create SQL insertion
 	insertStmt := `INSERT INTO %s_%d (time, channel_id, tag_id, value) VALUES (?,?,?,?);`
 	insertStmt = fmt.Sprintf(insertStmt, s.Measurement, s.IdTag)
+	database_name := "./" + s.PatientId + ".db"
 
 	// init worker
 	for i := 0; i < s.NumTask; i++ {
 		s.WaitQuit.Add(1)
 		// main routine
 		go func() {
-			//s.Quit <- true
 			defer s.WaitQuit.Done()
+			// create local sqlite connection
+			conn, err := sql.Open("sqlite3", database_name)
+			if err != nil {
+				fmt.Println("Err sql.Open(): ", err)
+				return
+			}
+			defer conn.Close()
+
 			// main loop
 			for data := range s.Pipe {
 
 				// Transaction
-				tx, err := s.Connection.Begin()
+				tx, err := conn.Begin()
 				if err != nil {
 					fmt.Println("Err TX Begin(): ", err)
 				}
