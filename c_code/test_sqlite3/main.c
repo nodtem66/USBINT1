@@ -110,9 +110,29 @@ int main(int argc, char **argv)
 	}
 	STOP_TIMER();
 	
+	printf("Insert %d With TX for group of Stmt ", MAXITERS);
+	START_TIMER();
+	TRY(sqlite3_exec(conn, "BEGIN;", NULL, NULL, NULL), "TX Begin failed");
+	for (i=0; i<MAXITERS; i++) 
+	{
+		int ret;
+		sqlite3_reset(stmt);
+		TRY(sqlite3_bind_int64(stmt, 1, time_value++), "Bind int64[1] failed");
+		TRY(sqlite3_bind_int64(stmt, 2, channel_id), "Bind int64[2] failed");
+		TRY(sqlite3_bind_int64(stmt, 3, 0), "Bind int64[3] failed");
+		
+		if ((ret=sqlite3_step(stmt)) != SQLITE_DONE)
+		{
+			printf("[1] Step Error [time_value %d]", time_value);
+			goto out;
+		}
+	}
+	TRY(sqlite3_exec(conn, "COMMIT;", NULL, NULL, NULL), "TX Commit failed");
+	STOP_TIMER();
+	
 	printf("PRAGMA journal_mode=WAL ");
 	TRY(sqlite3_exec(conn, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL), "[FAIL]");
-	printf("[OK]\nBenchmark INSERT %d ", MAXITERS);
+	printf("[OK]\nBenchmark INSERT %d after using WAL", MAXITERS);
 	
 	START_TIMER();
 	for (i=0; i<MAXITERS; i++) 
@@ -131,7 +151,7 @@ int main(int argc, char **argv)
 	}
 	STOP_TIMER();
 	
-	printf("Benchmark INSERT with Transaction at each Statment ");
+	printf("Benchmark INSERT %d after using WAL with TX at each Stmt ", MAXITERS);
 	START_TIMER();
 	for (i=0; i<MAXITERS; i++)
 	{
@@ -149,7 +169,32 @@ int main(int argc, char **argv)
 		TRY(sqlite3_exec(conn, "COMMIT;", NULL, NULL, NULL), "TX Commit failed");
 	}
 	STOP_TIMER();
-	printf("Benchmark INSERT with Transaction for group of Statement ");
+	
+	printf("Benchmark INSERT %d with TX for group of 100 Stmt ", MAXITERS);
+	START_TIMER();
+	for (i=0; i<MAXITERS; i++)
+	{
+		int ret;
+		sqlite3_reset(stmt);
+		TRY(sqlite3_bind_int64(stmt, 1, time_value++), "Bind int64[1] failed");
+		TRY(sqlite3_bind_int64(stmt, 2, channel_id), "Bind int64[2] failed");
+		TRY(sqlite3_bind_int64(stmt, 3, 0), "Bind int64[3] failed");
+		if ((i % 100) == 0) {
+			TRY(sqlite3_exec(conn, "BEGIN;", NULL, NULL, NULL), "TX Begin failed");
+		}
+		if ((ret=sqlite3_step(stmt)) != SQLITE_DONE)
+		{
+			printf("[1] Step Error [time_value %d]", time_value);
+			goto out;
+		}
+		if ((i % 100) == 99) {
+			TRY(sqlite3_exec(conn, "COMMIT;", NULL, NULL, NULL), "TX Commit failed");
+		}
+	}
+	
+	STOP_TIMER();
+	
+	printf("Benchmark INSERT %d with TX for group of 1000 Stmt ", MAXITERS);
 	START_TIMER();
 	TRY(sqlite3_exec(conn, "BEGIN;", NULL, NULL, NULL), "TX Begin failed");
 	for (i=0; i<MAXITERS; i++)
