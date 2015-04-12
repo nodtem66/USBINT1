@@ -5,9 +5,9 @@
 #include <string.h>
 #include <errno.h>
 #include "sqlite3.h"
-
+#ifndef MAXITERS
 #define MAXITERS 1000
-
+#endif
 // macro to handle ERROR
 #define TRY(ret_err, msg) \
 	do { if (ret_err != SQLITE_OK) { printf(msg); goto out; } } while(0)
