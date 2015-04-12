@@ -77,8 +77,8 @@ func (i *DeviceHandle) OpenDevice(vid, pid int) {
 	i.Endpoint, i.OpenErr = i.Device.OpenEndpoint(1, 0, 0, ep.Address)
 }
 
-// SetPipe()
-// set the sqlite input pipe
+// SetProperty()
+// set the sqlite input pipe and SamplingTime
 func (i *IOHandle) SetProperty(pipe chan []int64, d time.Duration) {
 	i.Pipe = pipe
 	i.SamplingRate = d

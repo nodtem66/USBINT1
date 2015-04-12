@@ -14,6 +14,8 @@ func TestSqlite_Connect(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(sqlite.PatientId + ".db")
+	defer sqlite.Close()
+
 	if err := sqlite.EnableMeasurement([]string{"test"}); err != nil {
 		t.Fatal(err)
 	}
@@ -38,9 +40,6 @@ func TestSqlite_Connect(t *testing.T) {
 	if b != 0 {
 		t.Fatalf("Unexceptional Active Tag for `%s` (%d)", sqlite.Measurement, b)
 	}
-
-	sqlite.Close()
-
 }
 
 func TestSqlite_CreateTable(t *testing.T) {

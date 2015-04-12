@@ -56,6 +56,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/nodtem66/usbint1/event"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -111,7 +112,28 @@ func (s *SqliteHandle) ConnectNew() error {
 
 	// check database file exitsts
 	if _, err := os.Stat(database_name); err == nil {
-		os.Remove(database_name)
+
+		// Bugs: text file busy
+		// https://github.com/jnwhiteh/golang/blob/master/src/cmd/go/build.go
+		nbusy := 0
+		var removeErr error
+		// trying to remove file three time
+		// If `text file busy` error happens, sleep a little
+		// and try again.  We let this happen three times, with increasing
+		// sleep lengths: 100+200+400 ms = 0.7 seconds.
+		for {
+			removeErr = os.Remove(database_name)
+			if removeErr != nil && strings.Contains(removeErr.Error(), "text file busy") && nbusy < 3 {
+				time.Sleep(100 * time.Millisecond << uint(nbusy))
+				nbusy++
+				continue
+			} else {
+				break
+			}
+		}
+		if removeErr != nil {
+			return removeErr
+		}
 	}
 
 	return s.Connect()
@@ -119,7 +141,7 @@ func (s *SqliteHandle) ConnectNew() error {
 
 func (s *SqliteHandle) CreateTagTable() error {
 	// For optmize use PRAGMA journal_mod=WAL
-	if _, err := s.Connection.Exec(`PRAGMA journal_mod=WAL`); err != nil {
+	if _, err := s.Connection.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 		return err
 	}
 	// For optmize use PRAGMA synchronous=NORMAL
@@ -279,18 +301,19 @@ func (s *SqliteHandle) Start() {
 		s.WaitQuit.Add(1)
 		// main routine
 		go func() {
-
+			//s.Quit <- true
+			defer s.WaitQuit.Done()
 			// main loop
 			for data := range s.Pipe {
 
 				// Transaction
 				tx, err := s.Connection.Begin()
 				if err != nil {
-					fmt.Println("Err: ", err)
+					fmt.Println("Err TX Begin(): ", err)
 				}
 				stmt, err := tx.Prepare(insertStmt)
 				if err != nil {
-					fmt.Println("Err: ", err)
+					fmt.Println("Err TX Prepare(): ", err)
 				}
 
 				// Reset timeout
@@ -303,16 +326,14 @@ func (s *SqliteHandle) Start() {
 				data = data[1:]
 				for i, d := range data {
 					if _, err := stmt.Exec(timestamp, i, s.IdTag, d); err != nil {
-						fmt.Printf("ERROR %s\n", err)
+						fmt.Println("Err TX Exec: ", err)
 					}
 				}
 				//s.TimeStamp = s.TimeStamp.Add(s.SamplingRate)
 				if err := tx.Commit(); err != nil {
-					fmt.Println("Err: ", err)
+					fmt.Println("Err TX Commit(): ", err)
 				}
 			}
-			//s.Quit <- true
-			s.WaitQuit.Done()
 		}()
 	}
 
