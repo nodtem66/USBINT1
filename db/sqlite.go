@@ -64,6 +64,7 @@ import (
 type SqliteData []int64
 type SqliteHandle struct {
 	Connection   *sql.DB
+	DBName       string
 	EventChannel *EventSubscriptor
 	IdTag        int64
 	Pipe         chan []int64
@@ -93,8 +94,11 @@ func NewSqliteHandle() *SqliteHandle {
 func (s *SqliteHandle) Connect() (err error) {
 
 	// set the database name according to patientId
-	database_name := "./" + s.PatientId + ".db"
-	s.Connection, err = sql.Open("sqlite3", database_name)
+	// fix database is locked
+	// https://github.com/mattn/go-sqlite3/issues/148
+	s.DBName = fmt.Sprintf("file:%s.db?cache=shared&mode=rwc", s.PatientId)
+
+	s.Connection, err = sql.Open("sqlite3", s.DBName)
 	if err != nil {
 		return err
 	}
@@ -295,7 +299,6 @@ func (s *SqliteHandle) Start() {
 	// create SQL insertion
 	insertStmt := `INSERT INTO %s_%d (time, channel_id, tag_id, value) VALUES (?,?,?,?);`
 	insertStmt = fmt.Sprintf(insertStmt, s.Measurement, s.IdTag)
-	database_name := "./" + s.PatientId + ".db"
 
 	// init worker
 	for i := 0; i < s.NumTask; i++ {
@@ -304,7 +307,7 @@ func (s *SqliteHandle) Start() {
 		go func() {
 			defer s.WaitQuit.Done()
 			// create local sqlite connection
-			conn, err := sql.Open("sqlite3", database_name)
+			conn, err := sql.Open("sqlite3", s.DBName)
 			if err != nil {
 				fmt.Println("Err sql.Open(): ", err)
 				return
