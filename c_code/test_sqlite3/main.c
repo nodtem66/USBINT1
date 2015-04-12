@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sqlite3.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <string.h>
 #include <errno.h>
+#include "sqlite3.h"
 
 #define MAXITERS 1000
 
