@@ -282,7 +282,8 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 	}
 }
 
-func TestSqlite_SendMultipleTask(t *testing.T) {
+/*
+func TestSqlite_Send10Task(t *testing.T) {
 	event := NewEventHandler()
 	event.Start()
 
@@ -297,7 +298,37 @@ func TestSqlite_SendMultipleTask(t *testing.T) {
 	if err := sqlite.EnableMeasurement([]string{"test", "test2", "test3"}); err != nil {
 		t.Fatal(err)
 	}
-	sqlite.NumTask = 10
+	sqlite.NumTask = 60
+	sqlite.Start()
+	var i int64
+	for i = 0; i < 1000; i++ {
+		sqlite.Pipe <- []int64{i, 1, 0, 0}
+	}
+
+	sqlite.Stop()
+	var total int
+	if err := sqlite.Connection.QueryRow(`SELECT count(*) FROM general_1;`).Scan(&total); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Total insert: ", total)
+}
+*/
+func TestSqlite_SendOneTask(t *testing.T) {
+	event := NewEventHandler()
+	event.Start()
+
+	sqlite := NewSqliteHandle()
+	sqlite.PatientId = "T001"
+	if err := sqlite.ConnectNew(); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(sqlite.PatientId + ".db")
+	defer sqlite.Close()
+
+	if err := sqlite.EnableMeasurement([]string{"test", "test2", "test3"}); err != nil {
+		t.Fatal(err)
+	}
+	sqlite.NumTask = 1
 	sqlite.Start()
 	var i int64
 	for i = 0; i < 1000; i++ {

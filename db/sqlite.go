@@ -65,6 +65,7 @@ type SqliteData []int64
 type SqliteHandle struct {
 	Connection   *sql.DB
 	DBName       string
+	DBTimeout    int
 	EventChannel *EventSubscriptor
 	IdTag        int64
 	Pipe         chan []int64
@@ -96,7 +97,18 @@ func (s *SqliteHandle) Connect() (err error) {
 	// set the database name according to patientId
 	// fix database is locked
 	// https://github.com/mattn/go-sqlite3/issues/148
-	s.DBName = fmt.Sprintf("file:%s.db?cache=shared&mode=rwc", s.PatientId)
+	// _busy_timeout=XXX (default 5000 msec)
+	// mode=rwc
+	// cache=shared
+	// Due to IO speed, _busy_timeout must be properly set.
+	// Tested _busy_timeout
+	// ---------------------------------------
+	// | Target               | _busy_timour |
+	// ---------------------------------------
+	// | ArchLinux VirtualBox | 10000        |
+	// | Window 7 64bit       | 5000         |
+	// ---------------------------------------
+	s.DBName = fmt.Sprintf("file:%s.db?mode=rwc&_busy_timeout=10000", s.PatientId)
 
 	s.Connection, err = sql.Open("sqlite3", s.DBName)
 	if err != nil {
