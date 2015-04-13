@@ -1,3 +1,7 @@
+language: go
+go:
+  - 1.4
+  - tip
 before_install:
   - sudo rm /etc/apt/sources.list.d/*.list
   - sudo apt-get update -q
@@ -8,7 +12,8 @@ before_install:
   - pkg-config --list-all
   - pkg-config --libs libusb-1.0
   - pkg-config --modversion libusb-1.0
-language: go
-go:
-  - 1.4
-  - tip
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+script:
+    - $HOME/gopath/bin/goveralls -service=travis-ci
