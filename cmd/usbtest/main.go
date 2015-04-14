@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/kylelemons/gousb/usb"
+	"os"
 )
 
 func main() {
@@ -35,18 +37,26 @@ func main() {
 	fmt.Printf("Found %d device\n", len(devs))
 	if len(devs) > 0 {
 		dev := devs[0]
-		ep, err := dev.OpenEndpoint(1, 0, 0, 0x83)
-		if err != nil {
-			fmt.Println(err)
-			return
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			ep, err := dev.OpenEndpoint(1, 0, 0, 0x81)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			buffer := make([]byte, 8)
+			length, err := ep.Read(buffer)
+			if err != nil {
+				fmt.Println("[err] ", err)
+				return
+			}
+			fmt.Println("[ok] ", buffer[:length])
+			fmt.Printf("$ ")
+			text, _, _ := reader.ReadLine()
+			if string(text) == "exit" {
+				return
+			}
 		}
-		buffer := make([]byte, 64)
-		length, err := ep.Read(buffer)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Println(buffer[:length])
 	}
 
 }

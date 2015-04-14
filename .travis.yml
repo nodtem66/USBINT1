@@ -12,6 +12,9 @@ before_install:
   - pkg-config --libs libusb-1.0
   - pkg-config --modversion libusb-1.0
   - cd ../ && rm libusb-1.0.19.tar.gz && rm -rf libusb-1.0.19/
-  - go get github.com/axw/gocov/gocov
-  - go get github.com/mattn/goveralls
-  - go get golang.org/x/tools/cmd/cover
+  - git clone https://github.com/nodtem66/gousb $GOPATH/src/github.com/kylelemons/gousb
+script:
+  - go test -v github.com/nodtem66/usbint1/webapi
+  - go test -v github.com/nodtem66/usbint1/firmware
+  - go test -v github.com/nodtem66/usbint1/event
+  - go test -v github.com/nodtem66/usbint1/db
