@@ -58,7 +58,7 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 		// create new tag
 		f.Err = sqlite.EnableMeasurement([]string{"id", "temperature"})
 	} else if strings.HasPrefix(vendor, "CardioArt") &&
-		strings.Contains(product, "oximeter") {
+		strings.Contains(strings.ToLower(product), "oximeter") {
 		f.Id = 2
 		sqlite.Unit = "mV"
 		sqlite.ReferenceMin = 0
