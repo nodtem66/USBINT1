@@ -65,6 +65,9 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 		sqlite.ReferenceMax = 3.3
 		sqlite.Resolution = 4194304 //22 bit
 		sqlite.SamplingRate = time.Millisecond
+
+		// create new tag
+		f.Err = sqlite.EnableMeasurement([]string{"LED2", "LED1"})
 	} else if strings.HasPrefix(vendor, "CardioArt") &&
 		strings.Contains(strings.ToLower(product), "ecg") {
 		f.Id = 3
@@ -73,6 +76,9 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 		sqlite.ReferenceMax = 3.3
 		sqlite.Resolution = 16777216 //22 bit
 		sqlite.SamplingRate = time.Millisecond
+
+		// create new tag
+		f.Err = sqlite.EnableMeasurement([]string{"Lead-I", "Lead-II", "Lead-III"})
 	}
 	if f.Id == 0 {
 		f.Err = fmt.Errorf("No Firmware")

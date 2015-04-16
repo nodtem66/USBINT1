@@ -136,7 +136,7 @@ main_loop:
 		// read
 		_, err := endpoint.Read(buffer)
 		if err != nil {
-			//fmt.Printf("Error: %s\n", err)
+			fmt.Println("Error EP_READ:", err)
 			i.PacketErr++
 			continue main_loop
 		}
