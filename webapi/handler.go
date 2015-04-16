@@ -71,6 +71,7 @@ func New() *APIHandler {
 
 // Index page print program name and version
 func (h *APIHandler) Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprintf(w, "USBAPI [Version: %s] [Commit: %s]", h.Version, h.Commit)
 }
 
@@ -95,6 +96,7 @@ func (h *APIHandler) GetPatients(w http.ResponseWriter, r *http.Request, ps http
 	}
 	ret["result"] = patientId
 	jsonRet, _ := json.Marshal(ret)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, string(jsonRet))
 }
 
@@ -111,6 +113,7 @@ func (h *APIHandler) GetTags(w http.ResponseWriter, r *http.Request, ps httprout
 			ret["err"] = err0.Error()
 		}
 		jsonByte, _ := json.Marshal(ret)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fmt.Fprint(w, string(jsonByte))
 	}()
 
@@ -179,6 +182,7 @@ func (h *APIHandler) GetTag(w http.ResponseWriter, r *http.Request, ps httproute
 			ret["err"] = err0.Error()
 		}
 		jsonByte, _ := json.Marshal(ret)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fmt.Fprint(w, string(jsonByte))
 	}()
 
@@ -222,6 +226,7 @@ func (h *APIHandler) GetMeasurements(w http.ResponseWriter, r *http.Request, ps 
 			ret["err"] = err0.Error()
 		}
 		jsonByte, _ := json.Marshal(ret)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fmt.Fprint(w, string(jsonByte))
 	}()
 
@@ -280,6 +285,7 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 			ret["err"] = err0.Error()
 		}
 		jsonByte, _ := json.Marshal(ret)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fmt.Fprint(w, string(jsonByte))
 	}()
 
