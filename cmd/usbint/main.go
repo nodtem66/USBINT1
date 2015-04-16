@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DEFAULT_DEVICE_VID_PID = "10C4:8846"
+	DEFAULT_DEVICE_VID_PID = "10C4:8A40"
 )
 
 type CommandLine struct {

@@ -150,6 +150,15 @@ main_loop:
 		switch id {
 		case 1:
 			data = []int64{timestamp.UnixNano(), int64(buffer[1]), int64(buffer[0])}
+		case 2:
+			var data1, data2 int64
+			data1 = int64(buffer[0] << 16)
+			data1 += int64(buffer[1] << 8)
+			data1 += int64(buffer[2])
+			data2 = int64(buffer[3] << 16)
+			data2 += int64(buffer[4] << 8)
+			data2 += int64(buffer[5])
+			data = []int64{timestamp.UnixNano(), data1, data2}
 		default:
 			data = []int64{}
 		}

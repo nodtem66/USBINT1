@@ -60,6 +60,7 @@ func (c *Command) OpenDevice(vid usb.ID, pid usb.ID, isVerbose bool) error {
 func (c *Command) CloseDevice() {
 	if c.usbDev != nil {
 		c.usbDev.Close()
+		c.usbDev = nil
 	}
 }
 func (c *Command) Close() {

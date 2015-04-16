@@ -57,6 +57,22 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 
 		// create new tag
 		f.Err = sqlite.EnableMeasurement([]string{"id", "temperature"})
+	} else if strings.HasPrefix(vendor, "CardioArt") &&
+		strings.Contains(product, "oximeter") {
+		f.Id = 2
+		sqlite.Unit = "mV"
+		sqlite.ReferenceMin = 0
+		sqlite.ReferenceMax = 3.3
+		sqlite.Resolution = 4194304 //22 bit
+		sqlite.SamplingRate = time.Millisecond
+	} else if strings.HasPrefix(vendor, "CardioArt") &&
+		strings.Contains(strings.ToLower(product), "ecg") {
+		f.Id = 3
+		sqlite.Unit = "mV"
+		sqlite.ReferenceMin = 0
+		sqlite.ReferenceMax = 3.3
+		sqlite.Resolution = 16777216 //22 bit
+		sqlite.SamplingRate = time.Millisecond
 	}
 	if f.Id == 0 {
 		f.Err = fmt.Errorf("No Firmware")
