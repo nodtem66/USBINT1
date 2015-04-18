@@ -13,7 +13,7 @@ import (
 var (
 	isRunning          = true
 	history_file       = ".liner_history"
-	commands_completes = []string{"exit", "dev", "ep", "close", "help"}
+	commands_completes = []string{"exit", "dev", "ep", "close", "help", "name"}
 )
 
 type Command struct {
@@ -22,7 +22,7 @@ type Command struct {
 	line       *liner.State
 }
 
-func (c *Command) OpenDevice(vid usb.ID, pid usb.ID, isVerbose bool) error {
+func (c *Command) OpenDevice(vid usb.ID, pid usb.ID, num int, isVerbose bool) error {
 	// ListDevices is used to find the devices to open.
 	devs, err := c.usbContext.ListDevices(func(desc *usb.Descriptor) bool {
 		// The usbid package can be used to print out human readable information.
@@ -50,11 +50,12 @@ func (c *Command) OpenDevice(vid usb.ID, pid usb.ID, isVerbose bool) error {
 
 	// All Devices returned from ListDevices must be closed.
 	for i, d := range devs {
-		if i != 0 {
+		if i != num {
 			d.Close()
+		} else {
+			c.usbDev = devs[num]
 		}
 	}
-	c.usbDev = devs[0]
 	return nil
 }
 func (c *Command) CloseDevice() {
@@ -82,11 +83,11 @@ func (c *Command) ParseCommand(raw string) (err error) {
 	case "dev":
 		if len(line) == 1 {
 			fmt.Println("[ok] List all devices:")
-			err = c.OpenDevice(0, 0, true)
+			err = c.OpenDevice(0, 0, 0, true)
 
 		} else {
 			if len(line) >= 3 {
-				var vid, pid int64
+				var vid, pid, num int64
 				if vid, err = strconv.ParseInt(line[1], 16, 32); err != nil {
 					return
 				}
@@ -94,7 +95,14 @@ func (c *Command) ParseCommand(raw string) (err error) {
 					return
 				}
 				fmt.Printf("[ok] Open device %02X:%02X\n", vid, pid)
-				err = c.OpenDevice(usb.ID(vid), usb.ID(pid), false)
+				if len(line) >= 4 {
+					if num, err = strconv.ParseInt(line[3], 0, 32); err != nil {
+						return
+					}
+					err = c.OpenDevice(usb.ID(vid), usb.ID(pid), int(num), false)
+				} else {
+					err = c.OpenDevice(usb.ID(vid), usb.ID(pid), 0, false)
+				}
 
 			} else {
 				err = fmt.Errorf("Invalid params")
@@ -102,6 +110,24 @@ func (c *Command) ParseCommand(raw string) (err error) {
 		}
 	case "close":
 		c.CloseDevice()
+	case "get":
+		if len(line) == 1 {
+			err = fmt.Errorf("Invalid params")
+			return
+		}
+		switch line[1] {
+		case "string":
+			if len(line) < 3 {
+				err = fmt.Errorf("Missing params")
+			}
+			var index int64
+			if index, err = strconv.ParseInt(line[2], 0, 32); err == nil {
+				var mydesc string
+				if mydesc, err = c.usbDev.GetStringDescriptor(int(index)); err == nil {
+					fmt.Println("[ok] ", mydesc)
+				}
+			}
+		}
 	case "ep":
 		if c.usbDev == nil {
 			err = fmt.Errorf("No device")

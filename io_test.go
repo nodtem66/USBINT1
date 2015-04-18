@@ -12,7 +12,7 @@ func TestIO_StartStop(t *testing.T) {
 }
 func Test_Libusb(t *testing.T) {
 	io := NewIOHandle()
-	io.Dev.OpenDevice(0x10C4, 0x8846)
+	io.Dev.OpenDevice(0x10C4, 0x8a40)
 	if io.Dev.OpenErr != nil {
 		t.Fatal("No device")
 	}
@@ -35,7 +35,7 @@ func TestIO_OpenDevice(t *testing.T) {
 	io := NewIOHandle()
 	pipe := make(chan []int64, 1024)
 	io.SetProperty(pipe, time.Millisecond)
-	io.Dev.OpenDevice(0x10C4, 0x8846)
+	io.Dev.OpenDevice(0x10C4, 0x8a40)
 	if io.Dev.OpenErr != nil {
 		t.Fatal(io.Dev.OpenErr)
 	} else {
