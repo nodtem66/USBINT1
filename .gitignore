@@ -4,9 +4,10 @@ cmd/*/*.db
 db/*.db*
 */*/Debug/*
 c_code/*/*.db
+c_code/Makefile
 *.o
 *.d
 *.exe
 *.log
 *.out
-*.*
+*.liner_history
