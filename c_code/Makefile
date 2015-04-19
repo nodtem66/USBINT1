@@ -1,8 +1,8 @@
 .PHONY: clean All
 
 All:
-	@echo "----------Building project:[ test_sqlite3 - Debug ]----------"
-	@cd "test_sqlite3" && $(MAKE) -f  "test_sqlite3.mk"
+	@echo "----------Building project:[ usbint1 - Debug ]----------"
+	@cd "usbint1" && $(MAKE) -f  "usbint1.mk"
 clean:
-	@echo "----------Cleaning project:[ test_sqlite3 - Debug ]----------"
-	@cd "test_sqlite3" && $(MAKE) -f  "test_sqlite3.mk" clean
+	@echo "----------Cleaning project:[ usbint1 - Debug ]----------"
+	@cd "usbint1" && $(MAKE) -f  "usbint1.mk" clean

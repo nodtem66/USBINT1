@@ -78,7 +78,12 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 		sqlite.SamplingRate = time.Millisecond
 
 		// create new tag
-		f.Err = sqlite.EnableMeasurement([]string{"Lead-I", "Lead-II", "Lead-III"})
+		/*
+			f.Err = sqlite.EnableMeasurement([]string{"V6", "Lead-I", "Lead-II",
+				"V2", "V3", "V4", "V5", "V1", "Lead-III", "aVR", "aVL", "aVF"})
+		*/
+		f.Errr = sqlite.EnableMeasurement([]string{"Lead-I", "Lead-II",
+			"Lead-III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"})
 	}
 	if f.Id == 0 {
 		f.Err = fmt.Errorf("No Firmware")

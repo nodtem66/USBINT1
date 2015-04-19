@@ -5,15 +5,15 @@
 ## Debug
 ProjectName            :=test_libusb
 ConfigurationName      :=Debug
-WorkspacePath          := "D:\work\go\src\github.com\nodtem66\usbint1\test"
-ProjectPath            := "D:\work\go\src\github.com\nodtem66\usbint1\test\test_libusb"
+WorkspacePath          := "D:\work\go\src\github.com\nodtem66\usbint1\c_code"
+ProjectPath            := "D:\work\go\src\github.com\nodtem66\usbint1\c_code\test_libusb"
 IntermediateDirectory  :=./Debug
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=jirawat
-Date                   :=04/13/15
+Date                   :=04/19/15
 CodeLitePath           :="C:\Program Files (x86)\CodeLite"
 LinkerName             :=D:/bin/TDM-GCC-64/bin/g++.exe 
 SharedObjectLinkerName :=D:/bin/TDM-GCC-64/bin/g++.exe -shared -fPIC
@@ -90,7 +90,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.c$(ObjectSuffix): main.c $(IntermediateDirectory)/main.c$(DependSuffix)
-	$(CC) $(SourceSwitch) "D:/work/go/src/github.com/nodtem66/usbint1/test/test_libusb/main.c" $(CFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.c$(ObjectSuffix) $(IncludePath)
+	$(CC) $(SourceSwitch) "D:/work/go/src/github.com/nodtem66/usbint1/c_code/test_libusb/main.c" $(CFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.c$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.c$(DependSuffix): main.c
 	@$(CC) $(CFLAGS) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.c$(ObjectSuffix) -MF$(IntermediateDirectory)/main.c$(DependSuffix) -MM "main.c"
 

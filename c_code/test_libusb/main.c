@@ -10,7 +10,7 @@
 // Defines 
 //------------------------------------------------------------------------------
 #define ID_VENDOR		0x10C4
-#define ID_PRODUCT		0x8846
+#define ID_PRODUCT		0x8A40
 #define EP_INT_IN		0x83
 #define EP_PACKET_SIZE	64
 #define TRUE 1
@@ -151,6 +151,7 @@ int main()
 	//init signal handler
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+	signal(SIGBREAK, signal_handler);
 	
 	//init libusb
 	TRY("initializing libusb", libusb_init(NULL));
