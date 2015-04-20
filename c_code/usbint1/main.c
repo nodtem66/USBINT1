@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <time.h>
 #include "libusb.h"
 #include "sqlite3.h"
 
@@ -23,7 +24,9 @@
 #ifndef EP_ADDRESS
 #define EP_ADDRESS        0x83
 #endif
-
+#ifndef WAL_CHECKOUT_LENGTH
+#define WAL_CHECKOUT_LENGTH 1000
+#endif
 //------------------------------------------------------------------------------
 // Firmware
 //------------------------------------------------------------------------------
@@ -69,10 +72,10 @@
     do { if (ret_err != SQLITE_OK) { printf("error %s\n", msg);}} while(0)
 
 // macro start/stop timer
-#define START_TIMER() gettimeofday(&prev_tv, &tz)
-#define STOP_TIMER() gettimeofday(&tv, &tz)
+#define START_TIMER() clock_gettime(CLOCK_MONOTONIC, &prev_tv)
+#define STOP_TIMER() clock_gettime(CLOCK_MONOTONIC, &tv)
 #define f_RESULT_TIME (tv.tv_sec - prev_tv.tv_sec + \
-    (tv.tv_usec - prev_tv.tv_usec)/1.0e6)
+    (tv.tv_nsec - prev_tv.tv_nsec)/1.0e9)
     
 //------------------------------------------------------------------------------
 // Type declear
@@ -94,29 +97,31 @@ typedef struct _measurement_t {
 // Libusb
 static libusb_device_handle * LIBUSB_CALL dev_handle = NULL;
 static int EP_SIZE = 8;
+static int FIRMWARE_ID = FIRMWARE_ERROR;
 uint8_t buffer[1024];
 
 // Benchmark
-static struct timeval tv, prev_tv;
+static struct timespec tv, prev_tv;
 static time_t secTime = 0;
-static struct timezone tz;
 static int counter_usb = 0;
 static int counter_sqlite = 0;
-
-// management
-static volatile int do_exit = 0;
-static char patientID[100];
-static char db_filename[100];
-static char sqlite_path[100];
-static measurement_t mnt;
-static BOOL createNewDBFile = 0;
 
 // sqlite3
 sqlite3 *conn;
 sqlite3_stmt *stmt;
+static char patientID[100];
+static char db_filename[100];
+static char sqlite_path[100];
+static measurement_t mnt;
+static struct timespec time1;
+static BOOL createNewDBFile = 0;
 
-void init_sqlite();
-//void *run_sqlite_thread(void *);
+// management and pthread
+static volatile int do_exit = 0;
+static int counter_wal = 0;
+pthread_mutex_t lock1_mutex;
+pthread_cond_t wal_checkout_cv;
+
 
 //------------------------------------------------------------------------------
 // function prototype
@@ -131,16 +136,20 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *);
 int is_file_exist(char*); 
 int parse_opt(int, char**);
 void signal_handler (int);
+void clean_up();
 
 // Sqlite3
-
+void init_sqlite();
+void cache_prepare_sqlite();
+void finalize_sqlite();
+void *commit_thread_main(void*); 
 //------------------------------------------------------------------------------
 // Main function
 //------------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
     int ret_err = 0;
-    pthread_t sqlite_thread;
+    pthread_t commit_thread;
     pthread_attr_t attr;
     void *status;
     
@@ -171,14 +180,7 @@ int main(int argc, char **argv)
     scan_devices();
     if (dev_handle == NULL) {printf("No device"); goto exit_main;}
     
-    // init sqlite_thread
-    /*
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    TRY_STOP("initial sqlite_thread", pthread_create(
-        &sqlite_thread, &attr, run_sqlite_thread, NULL));
-    pthread_attr_destroy(&attr);
-    */
+    
      // Delete old test.db
 	if (createNewDBFile && is_file_exist(db_filename))
 	{
@@ -188,7 +190,21 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+    
+    // initialize sqlite context
     init_sqlite();
+    cache_prepare_sqlite();
+    
+    // initialize mutex and condition variable 
+    pthread_mutex_init(&lock1_mutex, NULL);
+    pthread_cond_init(&wal_checkout_cv, NULL);
+    
+    // initialize commit_thread
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    TRY_STOP("initial sqlite_thread", pthread_create(
+        &commit_thread, &attr, commit_thread_main, NULL));
+    pthread_attr_destroy(&attr);
     
     printf("[IO start]\n");
     TRY_LIBUSB("claming interface 0", libusb_claim_interface(dev_handle, 0));
@@ -199,18 +215,16 @@ int main(int argc, char **argv)
         TRY_LIBUSB2("handle event", libusb_handle_events(NULL));
     }
     
+    // wait for commit thread
+    TRY("wait for sqlite_thread exit", pthread_join(commit_thread, &status));
+exit_main:        
     #ifndef __MINGW32__
     #ifndef __MINGW64__
-    STOP_TIMER();
-    printf("[IO Stop] [Running Time %.6f sec] [Read %d Loss %d Err %d]\n", 
-        f_RESULT_TIME, counter_usb, counter_usb - counter_sqlite, 0);
-    TRY_LIBUSB("release interface 0", libusb_release_interface(dev_handle, 0));    
+    clean_up();
+    finalize_sqlite();
     #endif
     #endif
-    TRY("wait for sqlite_thread exit", pthread_join(sqlite_thread, &status));
-exit_main:    
-    // clear libusb memory
-    if (dev_handle != NULL) libusb_close(dev_handle);
+    
     libusb_exit(NULL);
     pthread_exit(NULL);
     return ret_err;
@@ -241,10 +255,8 @@ void signal_handler (int param)
     printf("\nSIGNAL %d\n", param);
     do_exit = 1;
     #if defined(__MINGW32__) || defined(__MINGW64__)
-    STOP_TIMER();
-    printf("[IO Stop] [Running Time %.6f sec] [Read %d Loss %d Err %d]\n", 
-        f_RESULT_TIME, counter_usb, counter_usb - counter_sqlite, 0);
-    TRY_LIBUSB2("release interface 0", libusb_release_interface(dev_handle, 0));
+    clean_up();
+    finalize_sqlite();
     #endif
 }
 
@@ -286,6 +298,7 @@ static void scan_devices()
             if (fid == FIRMWARE_ERROR)
                 continue;
             
+            FIRMWARE_ID = fid;
             EP_SIZE = libusb_get_max_packet_size(dev, EP_ADDRESS);
             printf("[IO firmware %d] [open 0x%02X (%d bytes)]\n",
                 fid, EP_ADDRESS, EP_SIZE);
@@ -387,42 +400,177 @@ static int init_xfer(uint8_t endpoint)
 		0); //unlimit timeout
 	return libusb_submit_transfer(xfr);
 }
+
 // callback function when URB receive data
 static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 {
-	uint16_t i, len = 0;
-	
-	
+	uint16_t i = 0;
+    int ret_err;
+	uint8_t *packet;
+    
+	// checking transfer status
 	if (xfr->status != LIBUSB_TRANSFER_COMPLETED) 
 	{
 		printf("Error transfer status: %d\n", xfr->status);
 		libusb_free_transfer(xfr);
 		exit(3);
 	}
+    // increase packet counter
 	counter_usb++;
-
-	/*/
-	printf("[%d] XFR length: %u, actual_length: %u\n",
-		counter,
-		xfr->length,
-		xfr->actual_length);
-
-	for (i=0, len=xfr->actual_length; i<len; i++)
-	{
-		printf("%02d ", xfr->buffer[i]);
-	}
-	printf("\n");
-
-	gettimeofday(&tv, &tz);
-	secTime = tv.tv_sec - prev_tv.tv_sec;
-	if (secTime > 0)
-	{
-		printf("%ld ", secTime*1000000 + tv.tv_usec - prev_tv.tv_usec);
-	} else {
-		printf("%ld ", tv.tv_usec - prev_tv.tv_usec);
-	}
-	gettimeofday(&prev_tv, &tz);
-	*/
+    packet = xfr->buffer;
+    
+    // parse packet depended on firmware id
+    switch (FIRMWARE_ID) {
+        case FIRMWARE_CA_TEST:
+        
+        if (xfr->actual_length >= 6) {
+            
+            // Step 1: parse data
+            int64_t channel_value[2];
+            channel_value[0] = (int64_t)packet[0];
+            channel_value[1] = (int64_t)packet[1];
+            clock_gettime(CLOCK_REALTIME, &time1);
+            
+            // Step 2: sqlite insert
+            for (i=0; i<2; i++)
+            {
+                sqlite3_reset(stmt);
+                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+                sqlite3_bind_int64(stmt, 2, i);
+                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
+                sqlite3_bind_int64(stmt, 4, channel_value[i]);
+                ret_err = sqlite3_step(stmt);
+                if (ret_err != SQLITE_DONE) goto exit_xfer;
+            }
+            counter_sqlite++;
+            
+            // Step 3: wal_checkout
+            pthread_mutex_lock(&lock1_mutex);
+            counter_wal+=2;
+            if (counter_wal >= WAL_CHECKOUT_LENGTH)
+                pthread_cond_signal(&wal_checkout_cv);
+            pthread_mutex_unlock(&lock1_mutex);
+            
+            counter_sqlite++;
+        }
+        break;
+        case FIRMWARE_CA_PULSE_OXIMETER:
+        if (xfr->actual_length >= 6) {
+            
+            // Step 1: parse data
+            int64_t channel_value[2];
+            channel_value[0] = (packet[0] << 16) & 0xFF0000;
+            channel_value[0] += (packet[1] << 8) & 0x00FF00;
+            channel_value[0] += (packet[2] & 0x0000FF);
+            channel_value[1] = (packet[3] << 16) & 0xFF0000;
+            channel_value[1] += (packet[4] << 8) & 0x00FF00;
+            channel_value[1] += (packet[5] & 0x0000FF);
+            clock_gettime(CLOCK_REALTIME, &time1);
+            
+            // Step 2: sqlite insert
+            for (i=0; i<2; i++)
+            {
+                sqlite3_reset(stmt);
+                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+                sqlite3_bind_int64(stmt, 2, i);
+                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
+                sqlite3_bind_int64(stmt, 4, channel_value[i]);
+                ret_err = sqlite3_step(stmt);
+                if (ret_err != SQLITE_DONE) goto exit_xfer;
+            }
+            counter_sqlite++;
+            
+            // Step 3: wal_checkout
+            pthread_mutex_lock(&lock1_mutex);
+            counter_wal+=2;
+            if (counter_wal >= WAL_CHECKOUT_LENGTH)
+                pthread_cond_signal(&wal_checkout_cv);
+            pthread_mutex_unlock(&lock1_mutex);
+        }
+        break;
+        case FIRMWARE_CA_ECG_MONITOR:
+        if (xfr->actual_length >= 27) {
+            
+            // Step 1: parse data
+            /* CH1 = V6
+             * CH2 = Lead-I 
+             * CH3 = Lead-II
+             * CH4 = V2
+             * CH5 = V3
+             * CH6 = V4
+             * CH7 = V5
+             * CH8 = V1
+             * Lead-III = Lead II - Lead I
+             * aVR = -(Lead II + Lead I) /2
+             * aVL = LeadI - LeadII/2
+             * aVF = LeadII - LeadI/2
+             */
+            int64_t channel_value[12];
+            // Lead I
+            channel_value[0] = (packet[6] << 16) & 0xFF0000;
+            channel_value[0] += (packet[7] << 8) & 0x00FF00;
+            channel_value[0] += (packet[8] & 0x0000FF);
+            // Lead II
+            channel_value[1] = (packet[9] << 16) & 0xFF0000;
+            channel_value[1] += (packet[10] << 8) & 0x00FF00;
+            channel_value[1] += (packet[11] & 0x0000FF);
+            // V1
+            channel_value[6] = (packet[24] << 16) & 0xFF0000;
+            channel_value[6] += (packet[25] << 8) & 0x00FF00;
+            channel_value[6] += (packet[26] & 0x0000FF);
+            // V2
+            channel_value[7] = (packet[12] << 16) & 0xFF0000;
+            channel_value[7] += (packet[13] << 8) & 0x00FF00;
+            channel_value[7] += (packet[14] & 0x0000FF);
+            // V3
+            channel_value[8] = (packet[15] << 16) & 0xFF0000;
+            channel_value[8] += (packet[16] << 8) & 0x00FF00;
+            channel_value[8] += (packet[17] & 0x0000FF);
+            // V4
+            channel_value[9] = (packet[18] << 16) & 0xFF0000;
+            channel_value[9] += (packet[19] << 8) & 0x00FF00;
+            channel_value[9] += (packet[20] & 0x0000FF);
+            // V5
+            channel_value[10] = (packet[21] << 16) & 0xFF0000;
+            channel_value[10] += (packet[22] << 8) & 0x00FF00;
+            channel_value[10] += (packet[23] & 0x0000FF);
+            // V6
+            channel_value[11] = (packet[3] << 16) & 0xFF0000;
+            channel_value[11] += (packet[4] << 8) & 0x00FF00;
+            channel_value[11] += (packet[5] & 0x0000FF);
+            // Lead III
+            channel_value[2] = channel_value[1] - channel_value[0];
+            // aVR
+            channel_value[3] = -(channel_value[1]+channel_value[0])/2;
+            // aVL
+            channel_value[4] = channel_value[0] - channel_value[1]/2;
+            // aVF
+            channel_value[5] = channel_value[1] - channel_value[0]/2;
+            clock_gettime(CLOCK_REALTIME, &time1);
+            
+            // Step 2: sqlite insert
+            for (i=0; i<12; i++)
+            {
+                sqlite3_reset(stmt);
+                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+                sqlite3_bind_int64(stmt, 2, i);
+                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
+                sqlite3_bind_int64(stmt, 4, channel_value[i]);
+                ret_err = sqlite3_step(stmt);
+                if (ret_err != SQLITE_DONE) goto exit_xfer;
+            }
+            counter_sqlite++;
+            // Step 3: wal_checkout
+            pthread_mutex_lock(&lock1_mutex);
+            counter_wal+=12;
+            if (counter_wal >= WAL_CHECKOUT_LENGTH)
+                pthread_cond_signal(&wal_checkout_cv);
+            pthread_mutex_unlock(&lock1_mutex);
+        }
+        break;
+    }
+exit_xfer:
+    // re submit interrupt transfer
 	if (libusb_submit_transfer(xfr) < 0)
 	{
 		printf("Error re-submmit transfer\n");
@@ -515,6 +663,7 @@ int parse_opt(int argc, char **argv)
 void init_sqlite()
 {
     int ret_err;
+    char *measurementTable;
     printf("[Sqlite open %s]\n", sqlite_path);
     TRY_SQLITE("open db_file failed", sqlite3_open_v2(sqlite_path, &conn,
         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL));
@@ -617,7 +766,7 @@ void init_sqlite()
 	 *   | 1988-09-0909  | 2    |  78909  | 1       |
 	 *   --------------------------------------------
 	 */
-    char *measurementTable = (char*) malloc(300);
+    measurementTable = (char*) malloc(300);
     sprintf(measurementTable, "CREATE TABLE IF NOT EXISTS %s_%d (\
         time INTEGER NOT NULL,\
         channel_id INTEGER NOT NULL,\
@@ -626,7 +775,85 @@ void init_sqlite()
         PRIMARY KEY (time, channel_id, tag_id));", mnt.name, mnt.tag_id);
 	TRY_SQLITE("create measurement table", sqlite3_exec(conn, measurementTable
         , NULL, NULL, NULL));
-    free(measurementTable);
+    
 exit_main:
+    free(measurementTable);
     return;
+}
+
+void cache_prepare_sqlite()
+{
+    char *insertStmt;
+    if (conn) {
+        
+        // initial SQL raw string
+        insertStmt = (char*) malloc(sizeof(char)*500);
+        sprintf(insertStmt, "INSERT INTO %s_%d \
+        (time, channel_id, tag_id, value) VALUES (?,?,?,?);"
+        , mnt.name, mnt.tag_id);
+        
+        // prepares statement
+        TRY_SQLITE("cache insertion prepare stmt", 
+            sqlite3_prepare_v2(conn, insertStmt, -1, &stmt, NULL));
+        
+        TRY_SQLITE("begin TX from (inside cache_prepare_sqlite)",
+            sqlite3_exec(conn, "BEGIN;", NULL, NULL, NULL));
+    }
+exit_main:
+    // free raw SQL
+    free(insertStmt);
+    return;
+}
+
+// finalize_sqlite
+//  1. deselect the current measurement 
+//  2. Exec last commit to database
+void finalize_sqlite()
+{
+    int ret_err;
+    sqlite3_finalize(stmt);
+    TRY_SQLITE2("Disable current measurement", sqlite3_prepare_v2(conn, 
+        "UPDATE tag SET active = 0 WHERE id = ?;", -1, &stmt, NULL));
+    sqlite3_bind_int(stmt, 1, mnt.tag_id);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    TRY_SQLITE2("Last commit", sqlite3_exec(conn, "COMMIT;", NULL, NULL, NULL));
+    sqlite3_close_v2(conn);
+}
+void *commit_thread_main(void* t) 
+{
+    int ret_err;
+    
+    printf("[Commit-Thread start]\n");
+    
+    // main routine
+    while(!do_exit) 
+    {
+        pthread_mutex_lock(&lock1_mutex);
+        // wait for counter_wal > 1000
+        while(counter_wal < 1000) {
+            pthread_cond_wait(&wal_checkout_cv, &lock1_mutex);
+            TRY_SQLITE2("COMMIT from thread", sqlite3_exec(conn, 
+                "COMMIT;BEGIN;", NULL, NULL, NULL));
+            counter_wal = 0;
+        }
+        pthread_mutex_unlock(&lock1_mutex);
+    }
+    
+exit_main:
+    printf("[Commit-Thread stop]\n");
+    pthread_exit(NULL);
+}
+
+// clean up before exit
+void clean_up()
+{
+    STOP_TIMER();
+    printf("[IO Stop] [Running Time %.6f sec] [Read %d Loss %d Uncommit %d]\n", 
+        f_RESULT_TIME, counter_usb, counter_usb - counter_sqlite, counter_wal);
+    TRY_LIBUSB2("release interface 0", libusb_release_interface(dev_handle, 0));
+    pthread_mutex_destroy(&lock1_mutex);
+    pthread_cond_destroy(&wal_checkout_cv);
+    free(mnt.descriptor);
+    if (dev_handle != NULL) libusb_close(dev_handle);
 }
