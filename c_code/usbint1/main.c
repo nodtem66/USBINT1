@@ -334,8 +334,8 @@ int get_firmware_id(uint8_t im, uint8_t ip)
     }
     
     printf("[Device %s (%s)]\n", manufacturer, product);
-    if (strncmp(manufacturer, FIRMWARE_CA_TEST__MF, FIRMWARE_CA_TEST__MF_LEN) == 0
-        && strncmp(product, FIRMWARE_CA_TEST__PD, FIRMWARE_CA_TEST__PD_LEN) == 0)
+    if (strncasecmp(manufacturer, FIRMWARE_CA_TEST__MF, FIRMWARE_CA_TEST__MF_LEN) == 0
+        && strncasecmp(product, FIRMWARE_CA_TEST__PD, FIRMWARE_CA_TEST__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_TEST;
         mnt.ref_min = 0;
@@ -346,8 +346,8 @@ int get_firmware_id(uint8_t im, uint8_t ip)
         sprintf(mnt.unit, "Celcius");
         sprintf(mnt.descriptor, "{\"id\", \"temperature\"}");
     }
-    if (strncmp(manufacturer, FIRMWARE_CA_ECG_MONITOR__MF, FIRMWARE_CA_ECG_MONITOR__MF_LEN) == 0
-        && strncmp(product, FIRMWARE_CA_ECG_MONITOR__PD, FIRMWARE_CA_ECG_MONITOR__PD_LEN) == 0)
+    if (strncasecmp(manufacturer, FIRMWARE_CA_ECG_MONITOR__MF, FIRMWARE_CA_ECG_MONITOR__MF_LEN) == 0
+        && strncasecmp(product, FIRMWARE_CA_ECG_MONITOR__PD, FIRMWARE_CA_ECG_MONITOR__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_ECG_MONITOR;
         mnt.ref_min = 0;
@@ -362,8 +362,8 @@ int get_firmware_id(uint8_t im, uint8_t ip)
             \"aVR\", \"aVL\", \"aVF\", \"V1\", \"V2\", \"V3\", \"V4\", \
             \"V5\", \"V6\"}");
     }
-    if (strncmp(manufacturer, FIRMWARE_CA_PULSE_OXIMETER__MF, FIRMWARE_CA_PULSE_OXIMETER__MF_LEN) == 0
-        && strncmp(product, FIRMWARE_CA_PULSE_OXIMETER__PD, FIRMWARE_CA_PULSE_OXIMETER__PD_LEN) == 0)
+    if (strncasecmp(manufacturer, FIRMWARE_CA_PULSE_OXIMETER__MF, FIRMWARE_CA_PULSE_OXIMETER__MF_LEN) == 0
+        && strncasecmp(product, FIRMWARE_CA_PULSE_OXIMETER__PD, FIRMWARE_CA_PULSE_OXIMETER__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_PULSE_OXIMETER;
         mnt.ref_min = 0;

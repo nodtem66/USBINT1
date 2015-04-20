@@ -4,7 +4,7 @@
   <Project Name="test_sqlite3" Path="test_sqlite3/test_sqlite3.project" Active="No"/>
   <Project Name="usbint1" Path="usbint1/usbint1.project" Active="Yes"/>
   <BuildMatrix>
-    <WorkspaceConfiguration Name="Debug" Selected="yes">
+    <WorkspaceConfiguration Name="Debug" Selected="no">
       <Project Name="test_libusb" ConfigName="Debug"/>
       <Project Name="test_sqlite3" ConfigName="Debug"/>
       <Project Name="usbint1" ConfigName="Debug"/>

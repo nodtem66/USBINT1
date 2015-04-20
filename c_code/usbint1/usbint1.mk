@@ -2,12 +2,12 @@
 ## Auto Generated makefile by CodeLite IDE
 ## any manual changes will be erased      
 ##
-## Debug
+## Release
 ProjectName            :=usbint1
-ConfigurationName      :=Debug
+ConfigurationName      :=Release
 WorkspacePath          := "D:\work\go\src\github.com\nodtem66\usbint1\c_code"
 ProjectPath            := "D:\work\go\src\github.com\nodtem66\usbint1\c_code\usbint1"
-IntermediateDirectory  :=./Debug
+IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
@@ -28,7 +28,7 @@ LibraryPathSwitch      :=-L
 PreprocessorSwitch     :=-D
 SourceSwitch           :=-c 
 OutputFile             :=$(IntermediateDirectory)/$(ProjectName)
-Preprocessors          :=
+Preprocessors          :=$(PreprocessorSwitch)NDEBUG 
 ObjectSwitch           :=-o 
 ArchiveOutputSwitch    := 
 PreprocessOnlySwitch   :=-E
@@ -52,8 +52,8 @@ LibPath                := $(LibraryPathSwitch).
 AR       := D:/bin/TDM-GCC-64/bin/ar.exe rcu
 CXX      := D:/bin/TDM-GCC-64/bin/g++.exe 
 CC       := D:/bin/TDM-GCC-64/bin/gcc.exe 
-CXXFLAGS :=  -g -O0  $(Preprocessors)
-CFLAGS   :=  -g -O0  $(Preprocessors)
+CXXFLAGS :=  -O2 -Wall $(Preprocessors)
+CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
 AS       := D:/bin/TDM-GCC-64/bin/as.exe 
 
@@ -81,7 +81,7 @@ $(OutputFile): $(IntermediateDirectory)/.d $(Objects)
 	$(LinkerName) $(OutputSwitch)$(OutputFile) @$(ObjectsFileList) $(LibPath) $(Libs) $(LinkOptions)
 
 $(IntermediateDirectory)/.d:
-	@$(MakeDirCommand) "./Debug"
+	@$(MakeDirCommand) "./Release"
 
 PreBuild:
 
@@ -111,6 +111,6 @@ $(IntermediateDirectory)/sqlite3.c$(PreprocessSuffix): sqlite3.c
 ## Clean
 ##
 clean:
-	$(RM) -r ./Debug/
+	$(RM) -r ./Release/
 
 
