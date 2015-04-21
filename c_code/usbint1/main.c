@@ -71,6 +71,11 @@
 #define TRY_SQLITE2(msg, ret_err) \
     do { if (ret_err != SQLITE_OK) { printf("error %s\n", msg);}} while(0)
 
+// macro to define string
+#define SET_STR(var, val) var = (char*)malloc(sizeof(char)*sizeof(val)); \
+    sprintf(var, "%s", val);
+#define EOS(str) ((str) + strlen(str))
+    
 // macro start/stop timer
 #define START_TIMER() clock_gettime(CLOCK_MONOTONIC, &prev_tv)
 #define STOP_TIMER() clock_gettime(CLOCK_MONOTONIC, &tv)
@@ -88,7 +93,8 @@ typedef struct _measurement_t {
     double ref_min;
     double ref_max;
     int64_t sampling_rate;
-    char *descriptor;
+    char **descriptor;
+    int num_channel;
     BOOL active;
 } measurement_t;
 //------------------------------------------------------------------------------
@@ -102,7 +108,6 @@ uint8_t buffer[1024];
 
 // Benchmark
 static struct timespec tv, prev_tv;
-static time_t secTime = 0;
 static int counter_usb = 0;
 static int counter_sqlite = 0;
 
@@ -334,45 +339,57 @@ int get_firmware_id(uint8_t im, uint8_t ip)
     }
     
     printf("[Device %s (%s)]\n", manufacturer, product);
-    if (strncasecmp(manufacturer, FIRMWARE_CA_TEST__MF, FIRMWARE_CA_TEST__MF_LEN) == 0
-        && strncasecmp(product, FIRMWARE_CA_TEST__PD, FIRMWARE_CA_TEST__PD_LEN) == 0)
+    if (strncasecmp((char*)manufacturer, FIRMWARE_CA_TEST__MF, FIRMWARE_CA_TEST__MF_LEN) == 0
+        && strncasecmp((char*)product, FIRMWARE_CA_TEST__PD, FIRMWARE_CA_TEST__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_TEST;
         mnt.ref_min = 0;
         mnt.ref_max = 100;
         mnt.resolution = 100;
-        mnt.descriptor = (char*)malloc(sizeof(char)*strlen("{\"id\", \"temperature\"}")+10);
+        mnt.num_channel = 2;
+        mnt.descriptor = (char**)malloc(sizeof(intptr_t)*2);
         sprintf(mnt.name, "general");
         sprintf(mnt.unit, "Celcius");
-        sprintf(mnt.descriptor, "{\"id\", \"temperature\"}");
+        SET_STR(mnt.descriptor[0], "id");
+        SET_STR(mnt.descriptor[1], "temperature");
     }
-    if (strncasecmp(manufacturer, FIRMWARE_CA_ECG_MONITOR__MF, FIRMWARE_CA_ECG_MONITOR__MF_LEN) == 0
-        && strncasecmp(product, FIRMWARE_CA_ECG_MONITOR__PD, FIRMWARE_CA_ECG_MONITOR__PD_LEN) == 0)
+    if (strncasecmp((char*)manufacturer, FIRMWARE_CA_ECG_MONITOR__MF, FIRMWARE_CA_ECG_MONITOR__MF_LEN) == 0
+        && strncasecmp((char*)product, FIRMWARE_CA_ECG_MONITOR__PD, FIRMWARE_CA_ECG_MONITOR__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_ECG_MONITOR;
         mnt.ref_min = 0;
         mnt.ref_max = 3.3;
         mnt.resolution = 16777216;
-        mnt.descriptor = (char*)malloc(sizeof(char)*strlen(
-            "{\"Lead-I\", \"Lead-II\", \"Lead-III\", \"aVR\", \"aVL\", \"aVF\",\
-            \"V1\", \"V2\", \"V3\", \"V4\", \"V5\", \"V6\"}")+10);
+        mnt.num_channel = 12;
+        mnt.descriptor = (char**)malloc(sizeof(intptr_t)*12);
         sprintf(mnt.name, "ecg");
         sprintf(mnt.unit, "mV");
-        sprintf(mnt.descriptor, "{\"Lead-I\", \"Lead-II\", \"Lead-III\", \
-            \"aVR\", \"aVL\", \"aVF\", \"V1\", \"V2\", \"V3\", \"V4\", \
-            \"V5\", \"V6\"}");
+        SET_STR(mnt.descriptor[0], "Lead_I");
+        SET_STR(mnt.descriptor[1], "Lead_II");
+        SET_STR(mnt.descriptor[2], "Lead_III");
+        SET_STR(mnt.descriptor[3], "aVR");
+        SET_STR(mnt.descriptor[4], "aVL");
+        SET_STR(mnt.descriptor[5], "aVF");
+        SET_STR(mnt.descriptor[6], "V1");
+        SET_STR(mnt.descriptor[7], "V2");
+        SET_STR(mnt.descriptor[8], "V3");
+        SET_STR(mnt.descriptor[9], "V4");
+        SET_STR(mnt.descriptor[10], "V5");
+        SET_STR(mnt.descriptor[11], "V6");
     }
-    if (strncasecmp(manufacturer, FIRMWARE_CA_PULSE_OXIMETER__MF, FIRMWARE_CA_PULSE_OXIMETER__MF_LEN) == 0
-        && strncasecmp(product, FIRMWARE_CA_PULSE_OXIMETER__PD, FIRMWARE_CA_PULSE_OXIMETER__PD_LEN) == 0)
+    if (strncasecmp((char*)manufacturer, FIRMWARE_CA_PULSE_OXIMETER__MF, FIRMWARE_CA_PULSE_OXIMETER__MF_LEN) == 0
+        && strncasecmp((char*)product, FIRMWARE_CA_PULSE_OXIMETER__PD, FIRMWARE_CA_PULSE_OXIMETER__PD_LEN) == 0)
     {
         fid = FIRMWARE_CA_PULSE_OXIMETER;
         mnt.ref_min = 0;
         mnt.ref_max = 3.3;
         mnt.resolution = 4194304;
-        mnt.descriptor = (char*)malloc(sizeof(char)*strlen("{\"LED2\", \"LED1\"}")+10);
+        mnt.num_channel = 2;
+        mnt.descriptor = (char**)malloc(sizeof(intptr_t)*2);
         sprintf(mnt.name, "oxigen_sat");
         sprintf(mnt.unit, "mV");
-        sprintf(mnt.descriptor, "{\"LED2\", \"LED1\"}");
+        SET_STR(mnt.descriptor[0], "LED2");
+        SET_STR(mnt.descriptor[1], "LED1");
     }
     
 exit_firmware:
@@ -404,7 +421,6 @@ static int init_xfer(uint8_t endpoint)
 // callback function when URB receive data
 static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
 {
-	uint16_t i = 0;
     int ret_err;
 	uint8_t *packet;
     
@@ -423,28 +439,19 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
     switch (FIRMWARE_ID) {
         case FIRMWARE_CA_TEST:
         
-        if (xfr->actual_length >= 6) {
-            
-            // Step 1: parse data
-            int64_t channel_value[2];
-            channel_value[0] = (int64_t)packet[0];
-            channel_value[1] = (int64_t)packet[1];
+        if (xfr->actual_length >= 2) {
             clock_gettime(CLOCK_REALTIME, &time1);
             
-            // Step 2: sqlite insert
-            for (i=0; i<2; i++)
-            {
-                sqlite3_reset(stmt);
-                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
-                sqlite3_bind_int64(stmt, 2, i);
-                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
-                sqlite3_bind_int64(stmt, 4, channel_value[i]);
-                ret_err = sqlite3_step(stmt);
-                if (ret_err != SQLITE_DONE) goto exit_xfer;
-            }
+            // Step 1: sqlite insert            
+            sqlite3_reset(stmt);
+            sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+            sqlite3_bind_int64(stmt, 2, (int64_t)packet[0]);
+            sqlite3_bind_int64(stmt, 3, (int64_t)packet[1]);
+            ret_err = sqlite3_step(stmt);
+            if (ret_err != SQLITE_DONE) goto exit_xfer;
             counter_sqlite++;
             
-            // Step 3: wal_checkout
+            // Step 2: wal_checkout
             pthread_mutex_lock(&lock1_mutex);
             counter_wal+=2;
             if (counter_wal >= WAL_CHECKOUT_LENGTH)
@@ -468,16 +475,12 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
             clock_gettime(CLOCK_REALTIME, &time1);
             
             // Step 2: sqlite insert
-            for (i=0; i<2; i++)
-            {
-                sqlite3_reset(stmt);
-                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
-                sqlite3_bind_int64(stmt, 2, i);
-                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
-                sqlite3_bind_int64(stmt, 4, channel_value[i]);
-                ret_err = sqlite3_step(stmt);
-                if (ret_err != SQLITE_DONE) goto exit_xfer;
-            }
+            sqlite3_reset(stmt);
+            sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+            sqlite3_bind_int64(stmt, 2, channel_value[0]);
+            sqlite3_bind_int64(stmt, 3, channel_value[1]);
+            ret_err = sqlite3_step(stmt);
+            if (ret_err != SQLITE_DONE) goto exit_xfer;
             counter_sqlite++;
             
             // Step 3: wal_checkout
@@ -549,17 +552,24 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
             clock_gettime(CLOCK_REALTIME, &time1);
             
             // Step 2: sqlite insert
-            for (i=0; i<12; i++)
-            {
-                sqlite3_reset(stmt);
-                sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
-                sqlite3_bind_int64(stmt, 2, i);
-                sqlite3_bind_int64(stmt, 3, mnt.tag_id);
-                sqlite3_bind_int64(stmt, 4, channel_value[i]);
-                ret_err = sqlite3_step(stmt);
-                if (ret_err != SQLITE_DONE) goto exit_xfer;
-            }
+            sqlite3_reset(stmt);
+            sqlite3_bind_int64(stmt, 1, (int64_t)(time1.tv_sec*1e9 + time1.tv_nsec));
+            sqlite3_bind_int64(stmt, 2, channel_value[0]);
+            sqlite3_bind_int64(stmt, 3, channel_value[1]);
+            sqlite3_bind_int64(stmt, 4, channel_value[2]);
+            sqlite3_bind_int64(stmt, 5, channel_value[3]);
+            sqlite3_bind_int64(stmt, 6, channel_value[4]);
+            sqlite3_bind_int64(stmt, 7, channel_value[5]);
+            sqlite3_bind_int64(stmt, 8, channel_value[6]);
+            sqlite3_bind_int64(stmt, 9, channel_value[7]);
+            sqlite3_bind_int64(stmt, 10, channel_value[8]);
+            sqlite3_bind_int64(stmt, 11, channel_value[9]);
+            sqlite3_bind_int64(stmt, 12, channel_value[10]);
+            sqlite3_bind_int64(stmt, 13, channel_value[11]);
+            ret_err = sqlite3_step(stmt);
+            if (ret_err != SQLITE_DONE) goto exit_xfer;
             counter_sqlite++;
+            
             // Step 3: wal_checkout
             pthread_mutex_lock(&lock1_mutex);
             counter_wal+=12;
@@ -580,7 +590,7 @@ exit_xfer:
 
 int parse_opt(int argc, char **argv)
 {
-    int index, c;
+    int c;
     size_t len_patient;
     while ((c = getopt(argc, argv, "n")) != -1) 
     {
@@ -599,9 +609,9 @@ int parse_opt(int argc, char **argv)
     {
         len_patient = strlen(argv[optind]);
         if (len_patient > 0) {
-            strncpy_s(patientID, sizeof(patientID), argv[optind], len_patient);
+            strncpy(patientID, argv[optind], len_patient);
             sprintf(db_filename, "%s.db", patientID);
-            sprintf(sqlite_path, "file:%s.db?mode=rwc", patientID);
+            sprintf(sqlite_path, "file:%s.db?mode=rwc&cache=shared", patientID);
             return 0;
         }
         printf("Empty patient ID\n");
@@ -626,44 +636,19 @@ int parse_opt(int argc, char **argv)
  *    2. Measurement Table name := Measurement_TagID
  *
  */
-/*   TAG TABLE |<-------------------TAGData ------------------------------->|
- *   --------------------------------------------------------------------------------------------------------------------
- *   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      |
- *   --------------------------------------------------------------------------------------------------------------------
- *   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            |
- *   --------------------------------------------------------------------------------------------------------------------
- *   e.g.
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} |
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}|
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}|
- *   --------------------------------------------------------------------------------------------------------------------
- *  MNT : Measurement
- *  CHN : Channel
- *  TABLE_NAMES : ECG1_1, ECG2_2, SPO2_3
- */
-
-/*   Structure MEASUREMENT Table
- *
- *   Table Name (see Policy 2.2) e.g. ECG_1
- *   --------------------------------------------
- *   | TIME    | CHANNEL_ID | VALUE   | TAG_ID  |
- *   --------------------------------------------
- *   | PRI_KEY | INTEGER    | INTEGER | INTEGER |
- *   --------------------------------------------
- *   e.g.
- *   --------------------------------------------
- *   | 109880980980  | 1    |  10908  | 1       |
- *   --------------------------------------------
- *   | 1988-09-0909  | 2    |  78909  | 1       |
- *   --------------------------------------------
- */
 void init_sqlite()
 {
-    int ret_err;
-    char *measurementTable;
+    int ret_err, i;
+    char *descriptor;
+    descriptor = (char*)malloc(sizeof(char)*mnt.num_channel*100);
+    sprintf(descriptor, "{");
+    // initialize descriptor
+    for (i=0; i<mnt.num_channel-1; i++) 
+    {
+        sprintf(EOS(descriptor), "\"%s\", ", mnt.descriptor[i]);
+    }
+    sprintf(EOS(descriptor), "\"%s\"}", mnt.descriptor[i]);
+    //printf("descriptor: %s\n", descriptor);
     printf("[Sqlite open %s]\n", sqlite_path);
     TRY_SQLITE("open db_file failed", sqlite3_open_v2(sqlite_path, &conn,
         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL));
@@ -674,22 +659,22 @@ void init_sqlite()
     
     /* Create table tag
 	   TAG TABLE |<-------------------TAGData ------------------------------->|
-	   --------------------------------------------------------------------------------------------------------------------
-	   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      |
-	   --------------------------------------------------------------------------------------------------------------------
-	   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            |
-	   --------------------------------------------------------------------------------------------------------------------
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      | Num Channel |
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            | INTEGER     |
+	   ----------------------------------------------------------------------------------------------------------------------------------
 	   e.g.
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} |
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}|
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}|
-	   --------------------------------------------------------------------------------------------------------------------
-	   MNT : Measurement
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} | 2           |
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}| 2           |
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}| 2           |
+	   ----------------------------------------------------------------------------------------------------------------------------------
 	   CHN : Channel
-	*/
+       TABLE_NAMES : ECG1_1, ECG2_2, SPO2_3
+    */
 	TRY_SQLITE("create tag table", sqlite3_exec(conn, 
         "CREATE TABLE IF NOT EXISTS tag (\
         id INTEGER NOT NULL PRIMARY KEY,\
@@ -699,6 +684,7 @@ void init_sqlite()
         ref_min INTEGER,\
         ref_max INTEGER,\
         sampling_rate INTEGER,\
+        num_channel INTEGER, \
         descriptor TEXT NOT NULL,\
         active INTEGER DEFAULT 0);", NULL, NULL, NULL));
         
@@ -706,15 +692,16 @@ void init_sqlite()
     TRY_SQLITE("prepare query tag", sqlite3_prepare_v2(conn, 
         "SELECT id FROM tag \
         WHERE mnt = ? AND unit = ? AND resolution = ? AND ref_min = ? \
-        AND ref_max = ? AND sampling_rate = ? AND descriptor= ?;"
-        , -1, &stmt, NULL));
+        AND ref_max = ? AND sampling_rate = ? AND descriptor= ? \
+        AND num_channel = ?;", -1, &stmt, NULL));
     sqlite3_bind_text(stmt, 1, mnt.name, strlen(mnt.name), 0);
     sqlite3_bind_text(stmt, 2, mnt.unit, strlen(mnt.unit), 0);
     sqlite3_bind_int64(stmt, 3, mnt.resolution);
     sqlite3_bind_double(stmt, 4, mnt.ref_min);
     sqlite3_bind_double(stmt, 5, mnt.ref_max);
     sqlite3_bind_int64(stmt, 6, mnt.sampling_rate);
-    sqlite3_bind_text(stmt, 7, mnt.descriptor, strlen(mnt.descriptor), 0);
+    sqlite3_bind_text(stmt, 7, descriptor, strlen(descriptor), 0);
+    sqlite3_bind_int(stmt, 8, mnt.num_channel);
     ret_err = sqlite3_step(stmt);
     if (ret_err == SQLITE_ROW) { // if old tag found; active the record
         mnt.tag_id = sqlite3_column_int(stmt, 0);
@@ -735,15 +722,16 @@ void init_sqlite()
         sqlite3_finalize(stmt);
         TRY_SQLITE("prepare insert tag", sqlite3_prepare_v2(conn, "INSERT INTO tag\
         (mnt, unit, resolution, ref_min, ref_max, sampling_rate, descriptor,\
-        active) VALUES (?,?,?,?,?,?,?,?);", -1, &stmt, NULL));
+        num_channel, active) VALUES (?,?,?,?,?,?,?,?,?);", -1, &stmt, NULL));
         sqlite3_bind_text(stmt, 1, mnt.name, strlen(mnt.name), 0);
         sqlite3_bind_text(stmt, 2, mnt.unit, strlen(mnt.unit), 0);
         sqlite3_bind_int64(stmt, 3, mnt.resolution);
         sqlite3_bind_double(stmt, 4, mnt.ref_min);
         sqlite3_bind_double(stmt, 5, mnt.ref_max);
         sqlite3_bind_int64(stmt, 6, mnt.sampling_rate);
-        sqlite3_bind_text(stmt, 7, mnt.descriptor, strlen(mnt.descriptor), 0);
-        sqlite3_bind_int(stmt, 8, 1);
+        sqlite3_bind_text(stmt, 7, descriptor, strlen(descriptor), 0);
+        sqlite3_bind_int(stmt, 8, mnt.num_channel);
+        sqlite3_bind_int(stmt, 9, 1);
         ret_err = sqlite3_step(stmt);
         if (ret_err == SQLITE_DONE) {
             mnt.tag_id = (int) sqlite3_last_insert_rowid(conn);
@@ -751,46 +739,61 @@ void init_sqlite()
         sqlite3_finalize(stmt);
     }
     
-    // insert measurement table
     // Create MEASUREMENT Table
 	/*   Structure MEASUREMENT Table
-	 *   --------------------------------------------
-	 *   | TIME    | CHANNEL_ID | VALUE   | TAG_ID  |
-	 *   --------------------------------------------
-	 *   | PRI_KEY | INTEGER    | INTEGER | INTEGER |
-	 *   --------------------------------------------
+	 *   ---------------------------------------------------------------------
+	 *   | TIME (nsec)  | SYNC    | CHANNEL_1 | CHANNEL_2 | .... | CHANNEL_N |
+	 *   ---------------------------------------------------------------------
+	 *   | PRI_KEY      | INTEGER | INTEGER   | INTEGER   | .... |  INTEGER  |
+	 *   ---------------------------------------------------------------------
 	 *   e.g.
-	 *   --------------------------------------------
-	 *   | 109880980980  | 1    |  10908  | 1       |
-	 *   --------------------------------------------
-	 *   | 1988-09-0909  | 2    |  78909  | 1       |
-	 *   --------------------------------------------
+	 *   ----------------------------------------------------------------------
+	 *   | 109880980980 | 0       | 10908     | 1         | ...... | ..       |
+	 *   ----------------------------------------------------------------------
+	 *   | 1988-09-0909 | 0       | 78909     | 1         | ...... | ..       |
+	 *   ----------------------------------------------------------------------
 	 */
-    measurementTable = (char*) malloc(300);
-    sprintf(measurementTable, "CREATE TABLE IF NOT EXISTS %s_%d (\
-        time INTEGER NOT NULL,\
-        channel_id INTEGER NOT NULL,\
-        tag_id INTEGER NOT NULL,\
-        value INTEGER NOT NULL,\
-        PRIMARY KEY (time, channel_id, tag_id));", mnt.name, mnt.tag_id);
-	TRY_SQLITE("create measurement table", sqlite3_exec(conn, measurementTable
+    char *measurementTable = (char*) malloc(100 + mnt.num_channel*100);
+    sprintf(measurementTable, "CREATE TABLE IF NOT EXISTS %s_%d (time INTEGER NOT NULL, sync INTEGER DEFAULT 0, ",
+        mnt.name, mnt.tag_id);
+    for (i=0; i<mnt.num_channel-1; i++)
+    {
+        sprintf(EOS(measurementTable), "%s INTEGER NOT NULL, ", mnt.descriptor[i]);
+    }
+    sprintf(EOS(measurementTable), "%s INTEGER NOT NULL);", mnt.descriptor[i]);
+    //printf("sql: %s\n", measurementTable);
+	TRY_SQLITE2("create measurement table", sqlite3_exec(conn, measurementTable
         , NULL, NULL, NULL));
+    free(measurementTable);
     
 exit_main:
-    free(measurementTable);
+    free(descriptor);
     return;
 }
 
 void cache_prepare_sqlite()
 {
-    char *insertStmt;
+    char *insertStmt = (char*) malloc(sizeof(char)*500);;
     if (conn) {
         
         // initial SQL raw string
-        insertStmt = (char*) malloc(sizeof(char)*500);
-        sprintf(insertStmt, "INSERT INTO %s_%d \
-        (time, channel_id, tag_id, value) VALUES (?,?,?,?);"
-        , mnt.name, mnt.tag_id);
+        switch (FIRMWARE_ID)
+        {
+            case FIRMWARE_CA_TEST:        
+            sprintf(insertStmt, "INSERT INTO %s_%d VALUES (?,0,?,?);"
+            , mnt.name, mnt.tag_id);
+            break;
+            case FIRMWARE_CA_PULSE_OXIMETER:
+            sprintf(insertStmt, "INSERT INTO %s_%d VALUES (?,0,?,?);"
+            , mnt.name, mnt.tag_id);
+            break;
+            case FIRMWARE_CA_ECG_MONITOR:
+            sprintf(insertStmt, "INSERT INTO %s_%d VALUES \
+            (?,0,?,?,?,?,?,?,?,?,?,?,?,?);", mnt.name, mnt.tag_id);
+            break;
+            default:
+            goto exit_main;
+        }
         
         // prepares statement
         TRY_SQLITE("cache insertion prepare stmt", 
@@ -810,7 +813,6 @@ exit_main:
 //  2. Exec last commit to database
 void finalize_sqlite()
 {
-    int ret_err;
     sqlite3_finalize(stmt);
     TRY_SQLITE2("Disable current measurement", sqlite3_prepare_v2(conn, 
         "UPDATE tag SET active = 0 WHERE id = ?;", -1, &stmt, NULL));
@@ -822,8 +824,6 @@ void finalize_sqlite()
 }
 void *commit_thread_main(void* t) 
 {
-    int ret_err;
-    
     printf("[Commit-Thread start]\n");
     
     // main routine
@@ -839,10 +839,9 @@ void *commit_thread_main(void* t)
         }
         pthread_mutex_unlock(&lock1_mutex);
     }
-    
-exit_main:
     printf("[Commit-Thread stop]\n");
     pthread_exit(NULL);
+    return (void*)NULL;
 }
 
 // clean up before exit
@@ -852,8 +851,17 @@ void clean_up()
     printf("[IO Stop] [Running Time %.6f sec] [Read %d Loss %d Uncommit %d]\n", 
         f_RESULT_TIME, counter_usb, counter_usb - counter_sqlite, counter_wal);
     TRY_LIBUSB2("release interface 0", libusb_release_interface(dev_handle, 0));
+    
+    // clean up pthread
     pthread_mutex_destroy(&lock1_mutex);
     pthread_cond_destroy(&wal_checkout_cv);
+    
+    // clean up _measurement_t allocation
+    int i;
+    for (i=0; i<mnt.num_channel; i++) free(mnt.descriptor[i]);
     free(mnt.descriptor);
+    
+    // close libusb handle
     if (dev_handle != NULL) libusb_close(dev_handle);
+    return;
 }
