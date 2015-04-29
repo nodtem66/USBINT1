@@ -82,7 +82,7 @@ func NewFirmware(io *IOHandle, sqlite *SqliteHandle) *Firmware {
 			f.Err = sqlite.EnableMeasurement([]string{"V6", "Lead-I", "Lead-II",
 				"V2", "V3", "V4", "V5", "V1", "Lead-III", "aVR", "aVL", "aVF"})
 		*/
-		f.Errr = sqlite.EnableMeasurement([]string{"Lead-I", "Lead-II",
+		f.Err = sqlite.EnableMeasurement([]string{"Lead-I", "Lead-II",
 			"Lead-III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"})
 	}
 	if f.Id == 0 {

@@ -24,6 +24,5 @@ install:
 script:
   - go test -v github.com/nodtem66/usbint1/webapi
   - go test -v github.com/nodtem66/usbint1/firmware
-  - go test -v github.com/nodtem66/usbint1/event
   - go test -v github.com/nodtem66/usbint1/db
   - cd ./c_code/usbint1 && make

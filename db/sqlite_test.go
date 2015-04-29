@@ -1,7 +1,6 @@
 package db
 
 import (
-	. "github.com/nodtem66/usbint1/event"
 	"os"
 	"testing"
 )
@@ -212,28 +211,6 @@ func TestSqlite_StartStop(t *testing.T) {
 	sqlite.Stop()
 }
 
-func TestSqlite_StartStopWithEventManager(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
-
-	sqlite := NewSqliteHandle()
-	sqlite.PatientId = "T001"
-	if err := sqlite.ConnectNew(); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(sqlite.PatientId + ".db")
-	defer sqlite.Close()
-
-	if err := sqlite.EnableMeasurement([]string{"test"}); err != nil {
-		t.Fatal(err)
-	}
-	sqlite.Start()
-	event.Subcribe(EVENT_DATABASE, sqlite.EventChannel)
-	event.SendMessage(EVENT_DATABASE, EVENT_DATABASE_TO_EXIT)
-	wait := event.Stop()
-	<-wait
-}
-
 func TestSqlite_Send(t *testing.T) {
 	//event := NewEventHandler()
 	//event.Start()
@@ -272,9 +249,6 @@ func TestSqlite_Send(t *testing.T) {
 }
 
 func TestSqlite_SendViaPipe(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
-
 	sqlite := NewSqliteHandle()
 	sqlite.PatientId = "T001"
 	if err := sqlite.ConnectNew(); err != nil {
@@ -309,41 +283,7 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 	}
 }
 
-/*
-func TestSqlite_Send10Task(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
-
-	sqlite := NewSqliteHandle()
-	sqlite.PatientId = "T001"
-	if err := sqlite.ConnectNew(); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(sqlite.PatientId + ".db")
-	defer sqlite.Close()
-
-	if err := sqlite.EnableMeasurement([]string{"test", "test2", "test3"}); err != nil {
-		t.Fatal(err)
-	}
-	sqlite.NumTask = 60
-	sqlite.Start()
-	var i int64
-	for i = 0; i < 1000; i++ {
-		sqlite.Pipe <- []int64{i, 1, 0, 0}
-	}
-
-	sqlite.Stop()
-	var total int
-	if err := sqlite.Connection.QueryRow(`SELECT count(*) FROM general_1;`).Scan(&total); err != nil {
-		t.Fatal(err)
-	}
-	t.Log("Total insert: ", total)
-}
-*/
 func TestSqlite_SendTask(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
-
 	sqlite := NewSqliteHandle()
 	sqlite.PatientId = "T001"
 	if err := sqlite.ConnectNew(); err != nil {
@@ -371,9 +311,6 @@ func TestSqlite_SendTask(t *testing.T) {
 }
 
 func TestSqlite_SendOneTask(t *testing.T) {
-	event := NewEventHandler()
-	event.Start()
-
 	sqlite := NewSqliteHandle()
 	sqlite.PatientId = "T001"
 	if err := sqlite.ConnectNew(); err != nil {

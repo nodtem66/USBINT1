@@ -67,7 +67,6 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	. "github.com/nodtem66/usbint1/event"
 	"os"
 	"runtime"
 	"strings"
@@ -77,17 +76,16 @@ import (
 
 type SqliteData []int64
 type SqliteHandle struct {
-	Connection   *sql.DB
-	DBName       string
-	EventChannel *EventSubscriptor
-	IdTag        int64
-	IdFirmware   int
-	Pipe         chan []int64
-	Quit         chan bool
-	WaitQuit     sync.WaitGroup
-	NumTask      int
-	TimeStamp    time.Time
-	Error        error
+	Connection *sql.DB
+	DBName     string
+	IdTag      int64
+	IdFirmware int
+	Pipe       chan []int64
+	Quit       chan bool
+	WaitQuit   sync.WaitGroup
+	NumTask    int
+	TimeStamp  time.Time
+	Error      error
 	DataTag
 }
 
@@ -99,10 +97,9 @@ func NewSqliteHandle() *SqliteHandle {
 			ReferenceMax: 1,
 			SamplingRate: time.Millisecond,
 		},
-		EventChannel: NewEventSubcriptor(),
-		Pipe:         make(chan []int64, LENGTH_QUEUE),
-		Quit:         make(chan bool),
-		NumTask:      runtime.NumCPU(),
+		Pipe:    make(chan []int64, LENGTH_QUEUE),
+		Quit:    make(chan bool),
+		NumTask: runtime.NumCPU(),
 	}
 	return sqlite
 }
@@ -343,16 +340,6 @@ func (s *SqliteHandle) Start() {
 	go func() {
 		s.WaitQuit.Wait()
 		s.Quit <- true
-	}()
-
-	// event routine
-	go func() {
-		for msg := range s.EventChannel.Pipe {
-			if msg.Name == EVENT_DATABASE && msg.Status == EVENT_DATABASE_TO_EXIT {
-				s.Stop()
-				s.EventChannel.Done <- struct{}{}
-			}
-		}
 	}()
 
 	// create SQL insertion
