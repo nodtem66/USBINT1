@@ -205,7 +205,9 @@ func TestSqlite_StartStop(t *testing.T) {
 	}
 	defer os.Remove(sqlite.PatientId + ".db")
 	defer sqlite.Close()
-	sqlite.EnableMeasurement([]string{"id", "temperature"})
+	if err := sqlite.EnableMeasurement([]string{"id", "temperature"}); err != nil {
+		t.Fatal(err)
+	}
 	sqlite.Start()
 	sqlite.Stop()
 }
@@ -256,16 +258,16 @@ func TestSqlite_Send(t *testing.T) {
 	//<-wait
 	sqlite.Stop()
 
-	rows, err := sqlite.Connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
+	rows, err := sqlite.Connection.Query(`SELECT time, sync, ch1, ch2, ch3 FROM general_1;`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for rows.Next() {
-		var n, time, c, tid int64
-		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
+		var s, time, ch1, ch2, ch3 int64
+		if err := rows.Scan(&time, &s, &ch1, &ch2, &ch3); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("[%d|%d:%d] %d\n", time, tid, c, n)
+		t.Logf("[%d|%d]\t%d\t%d\t%d\n", time, s, ch1, ch2, ch3)
 	}
 }
 
@@ -294,16 +296,16 @@ func TestSqlite_SendViaPipe(t *testing.T) {
 	sqlite.Pipe <- []int64{1024, 11}
 
 	sqlite.Stop()
-	rows, err := sqlite.Connection.Query(`SELECT time, channel_id, tag_id, value FROM general_1;`)
+	rows, err := sqlite.Connection.Query(`SELECT time, test value FROM general_1;`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for rows.Next() {
-		var n, time, c, tid int64
-		if err := rows.Scan(&time, &c, &tid, &n); err != nil {
+		var time, test_value int64
+		if err := rows.Scan(&time, &test_value); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("[%d|%d:%d] %d\n", time, tid, c, n)
+		t.Logf("[%d] %d\n", time, test_value)
 	}
 }
 

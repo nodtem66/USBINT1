@@ -110,6 +110,7 @@ func main() {
 
 	// start firmware
 	f := firmware.NewFirmware(io, sqlite)
+	sqlite.IdFirmware = f.Id
 
 	//start all services
 	sqlite.Start()

@@ -485,7 +485,7 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
             
             // Step 3: wal_checkout
             pthread_mutex_lock(&lock1_mutex);
-            counter_wal+=2;
+            counter_wal+=1;
             if (counter_wal >= WAL_CHECKOUT_LENGTH)
                 pthread_cond_signal(&wal_checkout_cv);
             pthread_mutex_unlock(&lock1_mutex);
@@ -572,7 +572,7 @@ static void LIBUSB_CALL callback_transfer(struct libusb_transfer *xfr)
             
             // Step 3: wal_checkout
             pthread_mutex_lock(&lock1_mutex);
-            counter_wal+=12;
+            counter_wal+=1;
             if (counter_wal >= WAL_CHECKOUT_LENGTH)
                 pthread_cond_signal(&wal_checkout_cv);
             pthread_mutex_unlock(&lock1_mutex);

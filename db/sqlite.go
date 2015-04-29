@@ -14,19 +14,19 @@
  *
  */
 /*   TAG TABLE |<-------------------TAGData ------------------------------->|
- *   --------------------------------------------------------------------------------------------------------------------
- *   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      |
- *   --------------------------------------------------------------------------------------------------------------------
- *   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            |
- *   --------------------------------------------------------------------------------------------------------------------
+ *   ----------------------------------------------------------------------------------------------------------------------------------
+ *   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      | Num Channel |
+ *   ----------------------------------------------------------------------------------------------------------------------------------
+ *   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            | INTEGER     |
+ *   ----------------------------------------------------------------------------------------------------------------------------------
  *   e.g.
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} |
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}|
- *   --------------------------------------------------------------------------------------------------------------------
- *   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}|
- *   --------------------------------------------------------------------------------------------------------------------
+ *   ---------------------------------------------------------------------------------------------------------------------------------
+ *   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} | 2          |
+ *   ---------------------------------------------------------------------------------------------------------------------------------
+ *   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}| 2          |
+ *   ---------------------------------------------------------------------------------------------------------------------------------
+ *   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}| 2          |
+ *   ---------------------------------------------------------------------------------------------------------------------------------
  *  MNT : Measurement
  *  CHN : Channel
  *  TABLE_NAMES : ECG1_1, ECG2_2, SPO2_3
@@ -35,17 +35,17 @@
 /*   Structure MEASUREMENT Table
  *
  *   Table Name (see Policy 2.2) e.g. ECG_1
- *   --------------------------------------------
- *   | TIME    | CHANNEL_ID | VALUE   | TAG_ID  |
- *   --------------------------------------------
- *   | PRI_KEY | INTEGER    | INTEGER | INTEGER |
- *   --------------------------------------------
+ *   ---------------------------------------------------------------------
+ *   | TIME (nsec)  | SYNC    | CHANNEL_1 | CHANNEL_2 | .... | CHANNEL_N |
+ *   ---------------------------------------------------------------------
+ *   | PRI_KEY      | INTEGER | INTEGER   | INTEGER   | .... |  INTEGER  |
+ *   ---------------------------------------------------------------------
  *   e.g.
- *   --------------------------------------------
- *   | 109880980980  | 1    |  10908  | 1       |
- *   --------------------------------------------
- *   | 1988-09-0909  | 2    |  78909  | 1       |
- *   --------------------------------------------
+ *   ----------------------------------------------------------------------
+ *   | 109880980980 | 0       | 10908     | 1         | ...... | ..       |
+ *   ----------------------------------------------------------------------
+ *   | 1988-09-0909 | 0       | 78909     | 1         | ...... | ..       |
+ *   ----------------------------------------------------------------------
  */
 
 /* Example usage:
@@ -53,11 +53,12 @@
 2. sqlite.Connect()
    or sqlite.ConnectNew()
 3. sqlite.EnableMeasurement()
-4. sqlite.Start()
-5. sqlite.Pipe <- []int64{}
+4. sqlite.IdFirmware = ...
+5. sqlite.Start()
+6. sqlite.Pipe <- []int64{}
    or sqlite.Send([]int64{})
-6. sqlite.Stop()
-7. sqlite.Close()
+7. sqlite.Stop()
+8. sqlite.Close()
 */
 package db
 
@@ -80,11 +81,13 @@ type SqliteHandle struct {
 	DBName       string
 	EventChannel *EventSubscriptor
 	IdTag        int64
+	IdFirmware   int
 	Pipe         chan []int64
 	Quit         chan bool
 	WaitQuit     sync.WaitGroup
 	NumTask      int
 	TimeStamp    time.Time
+	Error        error
 	DataTag
 }
 
@@ -182,20 +185,20 @@ func (s *SqliteHandle) CreateTagTable() error {
 		return err
 	}
 	/* Create table tag
-	   TAG TABLE |<-------------------TAGData ------------------------------->|
-	   --------------------------------------------------------------------------------------------------------------------
-	   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      |
-	   --------------------------------------------------------------------------------------------------------------------
-	   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            |
-	   --------------------------------------------------------------------------------------------------------------------
+		TAG TABLE
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | ID      | MNT   | UNIT | RESOLUTION | REFMAX | REFMIN | SamplingRate | ACTIVE  | Descriptor                      | Num Channel |
+	   ----------------------------------------------------------------------------------------------------------------------------------
+	   | PRI_KEY | TEXT  | TEXT | INTEGER    |  REAL  | REAL   | INTEGER(nsec)| INTEGER | TEXT                            | INTEGER     |
+	   ----------------------------------------------------------------------------------------------------------------------------------
 	   e.g.
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} |
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}|
-	   --------------------------------------------------------------------------------------------------------------------
-	   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}|
-	   --------------------------------------------------------------------------------------------------------------------
+	   ---------------------------------------------------------------------------------------------------------------------------------
+	   | 1       | ECG1  |  mV  | 2048       |  1     |  -1    | 1000         | 0       | {"1": "LEAD_I", "2": "LEAD_II"} | 2          |
+	   ---------------------------------------------------------------------------------------------------------------------------------
+	   | 2       | ECG2  |   V  | 1024       |  5     |   0    | 2000         | 1       | {"1": "LEAD_VI", "4": "LEAD_II"}| 2          |
+	   ---------------------------------------------------------------------------------------------------------------------------------
+	   | 3       | SPO2  |  %   | 1024       |  0     |  100   | 3000         | 0       | {"5": "LEAD_I", "10": "LEAD_II"}| 2          |
+	   ---------------------------------------------------------------------------------------------------------------------------------
 	   MNT : Measurement
 	   CHN : Channel
 	*/
@@ -208,6 +211,7 @@ func (s *SqliteHandle) CreateTagTable() error {
 	ref_max INTEGER,
 	sampling_rate INTEGER,
 	descriptor TEXT NOT NULL,
+	num_channel INTEGER,
 	active INTEGER DEFAULT 0);`
 
 	if _, err := s.Connection.Exec(tagTableStmt); err != nil {
@@ -223,8 +227,8 @@ func (s *SqliteHandle) CreateTagTable() error {
  * EnableMeasurement([]string{"LEAD_I", "LEAD_II"})
  */
 func (s *SqliteHandle) EnableMeasurement(desc []string) error {
-
-	if len(desc) == 0 {
+	num_channel := len(desc)
+	if num_channel == 0 {
 		fmt.Errorf("Empty DescriptorType")
 	}
 	// convert to json
@@ -232,11 +236,11 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 
 	queryMeasurementStmt := `SELECT id FROM tag WHERE 
 	mnt = ? AND unit = ? AND resolution = ? AND ref_min = ? AND 
-	ref_max = ? AND sampling_rate = ? AND descriptor= ?;`
+	ref_max = ? AND sampling_rate = ? AND descriptor= ? AND num_channel = ?;`
 
 	insertMeasurementStmt := `INSERT INTO tag 
-	(mnt, unit, resolution, ref_min, ref_max, sampling_rate, descriptor, active)
-	VALUES (?,?,?,?,?,?,?,?);`
+	(mnt, unit, resolution, ref_min, ref_max, sampling_rate, descriptor,
+	active, num_channel) VALUES (?,?,?,?,?,?,?,?,?);`
 
 	updateMeasurementStmt := `UPDATE tag SET active = 1 WHERE id = ?;`
 
@@ -253,7 +257,8 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 		s.ReferenceMin,
 		s.ReferenceMax,
 		s.SamplingRate,
-		string(jsonDdesc)).Scan(&s.IdTag)
+		string(jsonDdesc),
+		num_channel).Scan(&s.IdTag)
 	switch {
 	case err == sql.ErrNoRows:
 		// Insert new measurement in table tag and enable it
@@ -261,7 +266,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 		if err != nil {
 			return err
 		}
-		result, err := p.Exec(s.Measurement, s.Unit, s.Resolution, s.ReferenceMin, s.ReferenceMax, s.SamplingRate, string(jsonDdesc), 1)
+		result, err := p.Exec(s.Measurement, s.Unit, s.Resolution, s.ReferenceMin, s.ReferenceMax, s.SamplingRate, string(jsonDdesc), 1, num_channel)
 		if err != nil {
 			return err
 		}
@@ -288,24 +293,30 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 
 	// Create MEASUREMENT Table
 	/*   Structure MEASUREMENT Table
-	 *   --------------------------------------------
-	 *   | TIME    | CHANNEL_ID | VALUE   | TAG_ID  |
-	 *   --------------------------------------------
-	 *   | PRI_KEY | INTEGER    | INTEGER | INTEGER |
-	 *   --------------------------------------------
+	 *   ---------------------------------------------------------------------
+	 *   | TIME (nsec)  | SYNC    | CHANNEL_1 | CHANNEL_2 | .... | CHANNEL_N |
+	 *   ---------------------------------------------------------------------
+	 *   | PRI_KEY      | INTEGER | INTEGER   | INTEGER   | .... |  INTEGER  |
+	 *   ---------------------------------------------------------------------
 	 *   e.g.
-	 *   --------------------------------------------
-	 *   | 109880980980  | 1    |  10908  | 1       |
-	 *   --------------------------------------------
-	 *   | 1988-09-0909  | 2    |  78909  | 1       |
-	 *   --------------------------------------------
+	 *   ----------------------------------------------------------------------
+	 *   | 109880980980 | 0       | 10908     | 1         | ...... | ..       |
+	 *   ----------------------------------------------------------------------
+	 *   | 1988-09-0909 | 0       | 78909     | 1         | ...... | ..       |
+	 *   ----------------------------------------------------------------------
 	 */
 	measurementTableStmt := `CREATE TABLE IF NOT EXISTS %s_%d (
 	time INTEGER NOT NULL,
-	channel_id INTEGER NOT NULL,
-	tag_id INTEGER NOT NULL,
-	value INTEGER NOT NULL,
-	PRIMARY KEY (time, channel_id, tag_id));`
+	sync INTEGER DEFAULT 0,`
+
+	for i, d := range desc {
+		if i < num_channel-1 {
+			measurementTableStmt += strings.ToLower(d) + " INTEGER NOT NULL,"
+		} else {
+			measurementTableStmt += strings.ToLower(d) + " INTEGER NOT NULL);"
+		}
+
+	}
 	_, err = s.Connection.Exec(fmt.Sprintf(measurementTableStmt, s.Measurement, s.IdTag))
 	if err != nil {
 		return err
@@ -328,80 +339,7 @@ func (s *SqliteHandle) DisableMeasurement() error {
 // Must be start after EnableMeasurement
 func (s *SqliteHandle) Start() {
 
-	// create SQL insertion
-	insertStmt := `INSERT INTO %s_%d (time, channel_id, tag_id, value) VALUES (?,?,?,?);`
-	insertStmt = fmt.Sprintf(insertStmt, s.Measurement, s.IdTag)
-
-	// init worker
-	for i := 0; i < s.NumTask; i++ {
-		s.WaitQuit.Add(1)
-		// main routine
-		go func(id int) {
-			defer s.WaitQuit.Done()
-
-			// create local sqlite connection
-			conn, err := sql.Open("sqlite3", s.DBName)
-			if err != nil {
-				fmt.Println("Err sql.Open(): ", err)
-				return
-			}
-			defer conn.Close()
-
-			// cache prepare statement for speed up
-			var stmt *sql.Stmt
-			stmt, err = conn.Prepare(insertStmt)
-			if err != nil {
-				fmt.Println("Err TX Prepare(): ", err)
-			}
-			// init counter for transaction commit
-			// init local variables
-			counter := 0
-			isBegin := false
-			var timestamp int64
-
-			defer func() {
-				if isBegin {
-					if _, err = conn.Exec(`COMMIT;`); err != nil {
-						fmt.Println("Err TX Commit: ", err)
-					}
-					//fmt.Println("END routine ", id)
-				}
-			}()
-			// main loop
-			for data := range s.Pipe {
-				// init transaction for counter = 0
-				if isBegin == false {
-					_, err = conn.Exec(`BEGIN;`)
-					if err != nil {
-						fmt.Println("Err TX Begin(): ", err)
-					}
-					isBegin = true
-				}
-				timestamp = data[0]
-				data = data[1:]
-				for i, d := range data {
-					if _, err = stmt.Exec(timestamp, i, s.IdTag, d); err != nil {
-						fmt.Println("Err TX Exec: ", err)
-					}
-					counter++
-
-				}
-
-				// periodically commit when every 1000 record
-				if counter >= 1000 && isBegin == true {
-
-					if _, err = conn.Exec(`COMMIT;`); err != nil {
-						fmt.Println("Err TX Commit: ", err)
-					}
-					counter = 0
-					isBegin = false
-
-				}
-			}
-
-		}(i)
-	}
-
+	// wait-to-exit routine
 	go func() {
 		s.WaitQuit.Wait()
 		s.Quit <- true
@@ -416,6 +354,121 @@ func (s *SqliteHandle) Start() {
 			}
 		}
 	}()
+
+	// create SQL insertion
+	var insertStmt string
+	switch s.IdFirmware {
+	case 1:
+		insertStmt = fmt.Sprintf(
+			`INSERT INTO %s_%d VALUES (?,0,?,?);`, s.Measurement, s.IdTag)
+	case 2:
+		insertStmt = fmt.Sprintf(
+			`INSERT INTO %s_%d VALUES (?,0,?,?);`, s.Measurement, s.IdTag)
+	case 3:
+		insertStmt = fmt.Sprintf(
+			`INSERT INTO %s_%d VALUES (?,0,?,?,?,?,?,?,?,?,?,?,?,?);`,
+			s.Measurement, s.IdTag)
+	default:
+		s.Error = fmt.Errorf("No Match Firware Id")
+		return
+	}
+
+	// init worker
+	for i := 0; i < s.NumTask; i++ {
+		s.WaitQuit.Add(1)
+		// main routine
+		go func(id int) {
+			defer s.WaitQuit.Done()
+
+			// create local sqlite connection
+			conn, err := sql.Open("sqlite3", s.DBName)
+			if err != nil {
+				fmt.Println("Err sql.Open(): ", err)
+				s.Error = fmt.Errorf("Err sql.Open(): ", err)
+				return
+			}
+			defer conn.Close()
+
+			// cache prepare statement for speed up
+			var stmt *sql.Stmt
+			stmt, err = conn.Prepare(insertStmt)
+			if err != nil {
+				fmt.Println("Err TX Prepare(): ", err)
+				s.Error = fmt.Errorf("Err TX Prepare(): ", err)
+				return
+			}
+			// init counter for transaction commit
+			// init local variables
+			counter := 0
+			isBegin := false
+			var timestamp int64
+
+			defer func() {
+				if isBegin {
+					if _, err = conn.Exec(`COMMIT;`); err != nil {
+						fmt.Println("Err TX Commit: ", err)
+						s.Error = fmt.Errorf("Err TX Commit: ", err)
+					}
+					//fmt.Println("END routine ", id)
+				}
+			}()
+			// main loop
+			for data := range s.Pipe {
+				// init transaction for counter = 0
+				if isBegin == false {
+					_, err = conn.Exec(`BEGIN;`)
+					if err != nil {
+						fmt.Println("Err TX Begin(): ", err)
+						s.Error = fmt.Errorf("Err TX Begin(): ", err)
+					}
+					isBegin = true
+				}
+				timestamp = data[0]
+				data = data[1:]
+
+				// insert data
+				switch s.IdFirmware {
+				case 1:
+					if len(data) >= 2 {
+						if _, err = stmt.Exec(timestamp, data[0], data[1]); err != nil {
+							fmt.Println("Err TX Exec: ", err)
+							s.Error = fmt.Errorf("Err TX Exec: ", err)
+						}
+					}
+				case 2:
+					if len(data) >= 2 {
+						if _, err = stmt.Exec(timestamp, data[0], data[1]); err != nil {
+							fmt.Println("Err TX Exec: ", err)
+							s.Error = fmt.Errorf("Err TX Exec: ", err)
+						}
+					}
+				case 3:
+					if len(data) >= 12 {
+						if _, err = stmt.Exec(timestamp, data[0], data[1],
+							data[2], data[3], data[4], data[5], data[6], data[7],
+							data[8], data[9], data[10], data[11]); err != nil {
+							fmt.Println("Err TX Exec: ", err)
+							s.Error = fmt.Errorf("Err TX Exec: ", err)
+						}
+					}
+				}
+				counter++
+
+				// periodically commit when every 1000 record
+				if counter >= 1000 && isBegin == true {
+
+					if _, err = conn.Exec(`COMMIT;`); err != nil {
+						fmt.Println("Err TX Commit: ", err)
+						s.Error = fmt.Errorf("Err TX Commit: ", err)
+					}
+					counter = 0
+					isBegin = false
+
+				}
+			}
+
+		}(i)
+	}
 }
 
 func (s *SqliteHandle) Stop() {

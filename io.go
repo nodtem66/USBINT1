@@ -160,6 +160,9 @@ main_loop:
 			data2 += int64(buffer[4]) << 8
 			data2 += int64(buffer[5])
 			data = []int64{timestamp.UnixNano(), data1, data2}
+		case 3:
+			//TODO: add ECG support
+			data = []int64{}
 		default:
 			data = []int64{}
 		}
