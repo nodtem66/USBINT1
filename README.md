@@ -1,4 +1,4 @@
-# USBINT1 [![Build Status](https://travis-ci.org/nodtem66/USBINT1.svg)](https://travis-ci.org/nodtem66/USBINT1) [![Coverage Status](https://coveralls.io/repos/nodtem66/USBINT1/badge.svg)](https://coveralls.io/r/nodtem66/USBINT1) [![GoDoc](http://godoc.org/github.com/nodtem66/USBINT1?status.png)](http://godoc.org/github.com/nodtem66/USBINT1)
+# USBINT1 [![Build Status](https://travis-ci.org/nodtem66/USBINT1.svg)](https://travis-ci.org/nodtem66/USBINT1) [![GoDoc](http://godoc.org/github.com/nodtem66/USBINT1?status.png)](http://godoc.org/github.com/nodtem66/USBINT1)
 USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://github.com/nodtem66/USBINT1-C8051F380)
 
 ## Test OS
@@ -33,3 +33,4 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 
 ## Related projects
 * [USBINT1-C8051F380](https://github.com/nodtem66/USBINT1-C8051F380): An USB firmware for Silab C8051F380
+* [USBINT2](https://github.com/nodtem66/USBINT2): Sqlite3 to MariaDB synchronization 

@@ -26,7 +26,7 @@ target: $(OBJ)
 	@$(MAKE) --no-print-directory post-build
 
 
-%.o: %.c
+build/%.o: %.c
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
