@@ -95,7 +95,7 @@ typedef struct _measurement_t {
     int64_t sampling_rate;
     char **descriptor;
     int num_channel;
-    BOOL active;
+    int active;
 } measurement_t;
 //------------------------------------------------------------------------------
 // Global variables
@@ -119,7 +119,7 @@ static char db_filename[100];
 static char sqlite_path[100];
 static measurement_t mnt;
 static struct timespec time1;
-static BOOL createNewDBFile = 0;
+static int createNewDBFile = 0;
 
 // management and pthread
 static volatile int do_exit = 0;
@@ -161,7 +161,9 @@ int main(int argc, char **argv)
     // register signal handler
     signal(SIGTERM, signal_handler);
     signal(SIGINT, signal_handler);
+    #ifdef SIGBREAK
     signal(SIGBREAK, signal_handler);
+    #endif
     #ifdef SIGKILL
     signal(SIGKILL, signal_handler);
     #endif

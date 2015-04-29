@@ -13,8 +13,17 @@ before_install:
   - pkg-config --modversion libusb-1.0
   - cd ../ && rm libusb-1.0.19.tar.gz && rm -rf libusb-1.0.19/
   - git clone https://github.com/nodtem66/gousb $GOPATH/src/github.com/kylelemons/gousb
+
+install:
+  - go get -v github.com/BurntSushi/toml
+  - go get -v github.com/nodtem66/usbint1
+  - go get -v github.com/julienschmidt/httprouter
+  - go get -v github.com/mattn/go-sqlite3
+  - go get -v github.com/peterh/liner
+
 script:
   - go test -v github.com/nodtem66/usbint1/webapi
   - go test -v github.com/nodtem66/usbint1/firmware
   - go test -v github.com/nodtem66/usbint1/event
   - go test -v github.com/nodtem66/usbint1/db
+  - cd ./c_code/usbint1 && make

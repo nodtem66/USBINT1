@@ -2,9 +2,12 @@
 */.clang
 cmd/*/*.db
 db/*.db*
-*/*/Debug/*
+c_code/*/Debug
+c_code/*/Release
 c_code/*/*.db
+c_code/*/*.mk
 c_code/Makefile
+c_code/*/build
 *.o
 *.d
 *.exe
