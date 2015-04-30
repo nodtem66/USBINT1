@@ -27,8 +27,9 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 * `usbapi`:
    command line to run webserver, serving the sqlite3 db with RESTful api
 * `usbsync`:
-   command line to run 
+   command line to run sync worker; move from device database file (sqlite3) to endpoint server (MariaDB in this case)
 * `usbshad`:
+   command line to run shaing work; minimize to database file by deleting and compacting sqlite3 file
 
 ## Bugs
 *  Exception 0xC0000005 on Window7 64bit
@@ -40,4 +41,3 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 
 ## Related projects
 * [USBINT1-C8051F380](https://github.com/nodtem66/USBINT1-C8051F380): An USB firmware for Silab C8051F380
-* [USBINT2](https://github.com/nodtem66/USBINT2): Sqlite3 to MariaDB synchronization 

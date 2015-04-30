@@ -23,6 +23,17 @@ func assertNotEqual(t *testing.T, expect interface{}, actual interface{}) {
 		t.Errorf("[Expect: %#v] == [Actual: %#v]", expect, actual)
 	}
 }
+func assertChannel(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
 func TestWebApi_Index(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
@@ -145,7 +156,7 @@ func TestWebApi_TagId(t *testing.T) {
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
 	if !strings.HasPrefix(w.Body.String(), `{"result":{"id":1`) {
-		t.Errorf("Error for test /patient/test/tag/1")
+		t.Errorf("Error for test /patient/test/tag/1: %s", w.Body.String())
 	}
 
 	r, _ = http.NewRequest("GET", "/patient/test/tag/-1", nil)
@@ -202,26 +213,26 @@ func TestWebApi_Measurement(t *testing.T) {
 func TestWebApi_MQL(t *testing.T) {
 	err0 := fmt.Errorf("Error")
 	testcase := map[string]MeasurementQL{
-		"limit=10&ch=0&orderby=desc": MeasurementQL{Limit: 10, OrderDESC: true, Channel: 0},
-		"limit=1000":                 MeasurementQL{Limit: 1000, OrderDESC: true, Channel: 0},
+		"limit=10&ch=0&orderby=desc": MeasurementQL{Limit: 10, OrderDESC: true, Channel: []string{"time", "0"}},
+		"limit=1000":                 MeasurementQL{Limit: 1000, OrderDESC: true, Channel: []string{"time"}},
 		"limit=1a":                   MeasurementQL{Err: err0},
-		"limit=-1":                   MeasurementQL{Limit: -1},
-		"orderby=asc":                MeasurementQL{Limit: 100, OrderDESC: false, Channel: 0},
-		"orderby=1-10":               MeasurementQL{Limit: 100, OrderDESC: false, Channel: 0},
-		"orderby=23":                 MeasurementQL{Limit: 100, OrderDESC: true, Channel: 0},
-		"ch=1":                       MeasurementQL{Limit: 100, OrderDESC: true, Channel: 1},
-		"ch=#12":                     MeasurementQL{Err: err0},
-		"ch=-1":                      MeasurementQL{Err: err0},
-		"before=10":                  MeasurementQL{Limit: 100, OrderDESC: true, Before: 10e9},
-		"before=10s":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 10e9},
-		"before=3ms":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 3e6},
-		"before=5us":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 5e3},
-		"before=9ns":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 9},
-		"after=2s":                   MeasurementQL{Limit: 100, OrderDESC: true, After: 2e9},
-		"after=7":                    MeasurementQL{Limit: 100, OrderDESC: true, After: 7e9},
-		"after=2ms":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2e6},
-		"after=2ns":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2},
-		"after=2us":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2e3},
+		"limit=-1":                   MeasurementQL{Limit: -1, OrderDESC: true, Channel: []string{"time"}},
+		"orderby=asc":                MeasurementQL{Limit: 100, OrderDESC: false, Channel: []string{"time"}},
+		"orderby=1-10":               MeasurementQL{Limit: 100, OrderDESC: false, Channel: []string{"time"}},
+		"orderby=23":                 MeasurementQL{Limit: 100, OrderDESC: true, Channel: []string{"time"}},
+		"ch=a":                       MeasurementQL{Limit: 100, OrderDESC: true, Channel: []string{"time", "a"}},
+		"ch=b123-2":                  MeasurementQL{Limit: 100, OrderDESC: true, Channel: []string{"time", "b123-2"}},
+		"ch=a,b,c":                   MeasurementQL{Limit: 100, OrderDESC: true, Channel: []string{"time", "a", "b", "c"}},
+		"before=10":                  MeasurementQL{Limit: 100, OrderDESC: true, Before: 10e9, Channel: []string{"time"}},
+		"before=10s":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 10e9, Channel: []string{"time"}},
+		"before=3ms":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 3e6, Channel: []string{"time"}},
+		"before=5us":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 5e3, Channel: []string{"time"}},
+		"before=9ns":                 MeasurementQL{Limit: 100, OrderDESC: true, Before: 9, Channel: []string{"time"}},
+		"after=2s":                   MeasurementQL{Limit: 100, OrderDESC: true, After: 2e9, Channel: []string{"time"}},
+		"after=7":                    MeasurementQL{Limit: 100, OrderDESC: true, After: 7e9, Channel: []string{"time"}},
+		"after=2ms":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2e6, Channel: []string{"time"}},
+		"after=2ns":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2, Channel: []string{"time"}},
+		"after=2us":                  MeasurementQL{Limit: 100, OrderDESC: true, After: 2e3, Channel: []string{"time"}},
 		"after=2na":                  MeasurementQL{Err: err0},
 		"after=2n":                   MeasurementQL{Err: err0},
 		"after=n":                    MeasurementQL{Err: err0},
@@ -234,7 +245,7 @@ func TestWebApi_MQL(t *testing.T) {
 		if actual.Err != nil && expect.Err != nil {
 			continue
 		} else if !(actual.After == expect.After && actual.Before == expect.Before &&
-			actual.Channel == expect.Channel && actual.Limit == expect.Limit &&
+			assertChannel(actual.Channel, expect.Channel) && actual.Limit == expect.Limit &&
 			actual.OrderDESC == actual.OrderDESC) {
 			t.Errorf("Error parse [QL: %s] [Actual %#v] [Expect %#v]", query, actual, expect)
 		}
@@ -252,20 +263,23 @@ func TestWebApi_MeasurementQuery(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
-	assertEqual(t, w.Body.String(), `{"result":[{"time":10112122,"value":10}]}`)
-	t.Log(w.Body)
+	if !strings.HasPrefix(w.Body.String(), `{"result":[{"time":`) {
+		t.Fatal(w.Body)
+	}
 
-	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10&ch=1", nil)
+	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=1&ch=sync", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
-	assertEqual(t, w.Body.String(), `{"result":[{"time":10112123,"value":10}]}`)
-	t.Log(w.Body)
+	if !strings.HasPrefix(w.Body.String(), `{"result":[{"sync":0,"time":`) {
+		t.Fatal(w.Body)
+	}
 
-	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10&ch=2", nil)
+	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10&ch=does_not_exist_column", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
-	assertEqual(t, w.Body.String(), `{"result":[]}`)
-	t.Log(w.Body)
+	if !strings.HasPrefix(w.Body.String(), `{"err":"`) {
+		t.Fatal(w.Body)
+	}
 }

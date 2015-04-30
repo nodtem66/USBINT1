@@ -26,12 +26,11 @@ type Tag struct {
 	RefMax       string `json:"ref_max"`
 	SamplingRate int64  `json:"sampling_rate"`
 	Description  string `json:"description"`
+	NumChannel   int    `json:"num_channel"`
 	Active       bool   `json:"active"`
 }
-type Measurement struct {
-	Time  int64 `json:"time"`
-	Value int64 `json:"value"`
-}
+type Measurement map[string]interface{}
+
 type MeasurementDescriptor struct {
 	Name        string   `json:"name"`
 	LastTime    int64    `json:"last_time"`
@@ -159,7 +158,7 @@ func (h *APIHandler) GetTags(w http.ResponseWriter, r *http.Request, ps httprout
 		result := Tag{}
 		rows.Scan(&result.Id, &result.Mnt, &result.Unit, &result.Resolution,
 			&result.RefMin, &result.RefMax, &result.SamplingRate,
-			&result.Description, &result.Active)
+			&result.Description, &result.NumChannel, &result.Active)
 		results = append(results, result)
 	}
 
@@ -208,7 +207,7 @@ func (h *APIHandler) GetTag(w http.ResponseWriter, r *http.Request, ps httproute
 	if err = conn.QueryRow("SELECT * FROM tag WHERE id = ?", tagId).Scan(&result.Id,
 		&result.Mnt, &result.Unit, &result.Resolution,
 		&result.RefMin, &result.RefMax, &result.SamplingRate,
-		&result.Description, &result.Active); err != nil {
+		&result.Description, &result.NumChannel, &result.Active); err != nil {
 		err0 = fmt.Errorf("no tag")
 		return
 	}
@@ -370,11 +369,11 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 			orderStmt = "ASC"
 		}
 		// prepare total statement
-		stmt := fmt.Sprintf(`SELECT time, value FROM %s WHERE channel_id = ? %s ORDER BY time %s LIMIT %d`,
-			mntId, whereStmt, orderStmt, mql.Limit,
+		stmt := fmt.Sprintf(`SELECT %s FROM %s ORDER BY time %s LIMIT %d`,
+			strings.Join(mql.Channel, ","), mntId, orderStmt, mql.Limit,
 		)
 		// query to rows
-		rows, err := conn.Query(stmt, mql.Channel)
+		rows, err := conn.Query(stmt)
 		if err != nil {
 			err0 = err
 			return
@@ -382,8 +381,23 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		// enumerate rows
 		m := make([]Measurement, mql.Limit)
 		i := 0
+		numChannel := len(mql.Channel)
 		for rows.Next() {
-			rows.Scan(&m[i].Time, &m[i].Value)
+			result := make([]int64, numChannel)
+
+			// load address of buffer into array of arguments
+			addr := make([]interface{}, numChannel)
+			for c := 0; c < numChannel; c++ {
+				addr[c] = &result[c]
+			}
+			// load value into address
+			rows.Scan(addr...)
+
+			// load buffer into map
+			m[i] = Measurement{}
+			for c := 0; c < numChannel; c++ {
+				m[i][mql.Channel[c]] = result[c]
+			}
 			i++
 		}
 		if rows.Err() != nil {
@@ -405,7 +419,7 @@ func (h *APIHandler) Close() {
 
 type MeasurementQL struct {
 	Limit     int
-	Channel   int
+	Channel   []string
 	After     int64
 	Before    int64
 	OrderDESC bool
@@ -415,7 +429,7 @@ type MeasurementQL struct {
 func ParseMeasurementQL(query url.Values) *MeasurementQL {
 	mql := &MeasurementQL{
 		Limit:     100,
-		Channel:   0,
+		Channel:   []string{"time"},
 		OrderDESC: true,
 	}
 	orderby := query.Get("orderby")
@@ -437,17 +451,7 @@ func ParseMeasurementQL(query url.Values) *MeasurementQL {
 		}
 	}
 	if len(ch) > 0 {
-		if i, err := strconv.ParseInt(ch, 10, 32); err != nil {
-			mql.Err = err
-			return mql
-		} else {
-			if i < 0 {
-				mql.Err = fmt.Errorf("invalid ch")
-				return mql
-			} else {
-				mql.Channel = int(i)
-			}
-		}
+		mql.Channel = append(mql.Channel, strings.Split(ch, ",")...)
 	}
 	afterLength := len(after)
 	if afterLength > 0 {
