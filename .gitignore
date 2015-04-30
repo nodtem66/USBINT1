@@ -8,6 +8,7 @@ c_code/*/*.db
 c_code/*/*.mk
 c_code/Makefile
 c_code/*/build
+shading/*.db*
 *.o
 *.d
 *.exe

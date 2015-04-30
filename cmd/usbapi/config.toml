@@ -15,4 +15,4 @@ address = ":8080"
 file = "./usbapi.log"
 
 [shading]
-interval = 10s
+interval = "10s"

@@ -61,7 +61,7 @@ func TestShading_Ticker(t *testing.T) {
 	if err = sqlite.ConnectNew(); err != nil {
 		t.Fatal(err)
 	}
-	//defer os.Remove(sqlite.PatientId + ".db")
+	defer os.Remove(sqlite.PatientId + ".db")
 	defer sqlite.Close()
 
 	if err := sqlite.EnableMeasurement([]string{"test", "test_2"}); err != nil {
@@ -77,12 +77,13 @@ func TestShading_Ticker(t *testing.T) {
 		}
 	}()
 	shade := NewHandler("./")
-	shade.Interval = time.Millisecond * 500
+	shade.Interval = time.Millisecond * 10
 	shade.MinimumSync = 0
 	shade.Start()
-	time.Sleep(time.Millisecond * 5010)
-	shade.Stop()
+	time.Sleep(time.Millisecond * 100)
 	sqlite.Stop()
+	time.Sleep(time.Millisecond * 20)
+	shade.Stop()
 	var page_size, page_count int64
 	if err = sqlite.Connection.QueryRow("PRAGMA page_size;").Scan(&page_size); err != nil {
 		t.Fatal(err)
