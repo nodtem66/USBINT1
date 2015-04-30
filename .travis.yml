@@ -14,16 +14,18 @@ before_install:
   - cd ../ && rm libusb-1.0.19.tar.gz && rm -rf libusb-1.0.19/
 
 install:
-  - go get -v github.com/BurntSushi/toml
-  - go get -v github.com/nodtem66/usbint1
-  - go get -v github.com/julienschmidt/httprouter
-  - go get -v github.com/mattn/go-sqlite3
-  - go get -v github.com/peterh/liner
+  - go get -t -v github.com/BurntSushi/toml
+  - go get -t -v github.com/nodtem66/usbint1
+  - go get -t -v github.com/julienschmidt/httprouter
+  - go get -t -v github.com/mattn/go-sqlite3
+  - go get -t -v github.com/peterh/liner
   - rm -rf $GOPATH/src/github.com/kylelemons/gousb
   - git clone https://github.com/nodtem66/gousb $GOPATH/src/github.com/kylelemons/gousb
 
 script:
+  - go test -v github.com/nodtem66/usbint1/config
   - go test -v github.com/nodtem66/usbint1/webapi
   - go test -v github.com/nodtem66/usbint1/firmware
   - go test -v github.com/nodtem66/usbint1/db
+  - go test -v github.com/nodtem66/usbint1/shading
   - cd ./c_code/usbint1 && make

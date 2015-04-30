@@ -14,6 +14,10 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 * `db`:
   the set of databases and loader. the database is endpoint to finish the steaming data
   the current db engine is sqlite3
+* `shading`:
+  the set of shading package to minimize size of database file after synchronization
+* `config`:
+  an model of configuration file used globally in `usbapi`, `usbsync`, and `usbshad`
 
 ## Commands in `cmd`
 * `usbint`:
@@ -22,6 +26,9 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
    command line to test `kylelemons/gousb`
 * `usbapi`:
    command line to run webserver, serving the sqlite3 db with RESTful api
+* `usbsync`:
+   command line to run 
+* `usbshad`:
 
 ## Bugs
 *  Exception 0xC0000005 on Window7 64bit

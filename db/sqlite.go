@@ -98,9 +98,9 @@ func NewSqliteHandle() *SqliteHandle {
 			ReferenceMax: 1,
 			SamplingRate: time.Millisecond,
 		},
-		Pipe:    make(chan []int64),
-		done:    make(chan struct{}),
-		Quit:    make(chan bool),
+		Pipe:    make(chan []int64, 1),
+		done:    make(chan struct{}, 1),
+		Quit:    make(chan bool, 1),
 		NumTask: runtime.NumCPU(),
 	}
 	return sqlite
@@ -230,6 +230,7 @@ func (s *SqliteHandle) EnableMeasurement(desc []string) error {
 	if num_channel == 0 {
 		fmt.Errorf("Empty DescriptorType")
 	}
+	s.NumChannel = num_channel
 	// convert to json
 	jsonDdesc, _ := json.Marshal(desc)
 
@@ -338,12 +339,6 @@ func (s *SqliteHandle) DisableMeasurement() error {
 // Must be start after EnableMeasurement
 func (s *SqliteHandle) Start() {
 
-	// wait-to-exit routine
-	go func() {
-		s.WaitQuit.Wait()
-		s.Quit <- true
-	}()
-
 	// create SQL insertion
 	var insertStmt string
 	switch s.IdFirmware {
@@ -358,12 +353,20 @@ func (s *SqliteHandle) Start() {
 			`INSERT INTO %s_%d VALUES (?,0,?,?,?,?,?,?,?,?,?,?,?,?);`,
 			s.Measurement, s.IdTag)
 	default:
-		s.Error = fmt.Errorf("No Match Firware Id")
-		return
+		if s.NumChannel == 0 {
+			return
+		}
+
+		insertStmt = fmt.Sprintf(`INSERT INTO %s_%d VALUES (?,0,`, s.Measurement, s.IdTag)
+		for i := 0; i < s.NumChannel-1; i++ {
+			insertStmt += `?,`
+		}
+		insertStmt += `?);`
 	}
 
 	// init worker
 	for i := 0; i < s.NumTask; i++ {
+
 		s.WaitQuit.Add(1)
 		// main routine
 		go func(id int) {
@@ -401,11 +404,11 @@ func (s *SqliteHandle) Start() {
 			}()
 
 			// main loop
-			for data := range s.Pipe {
+			for {
 				select {
 				case <-s.done:
 					return
-				default:
+				case data := <-s.Pipe:
 					// init transaction for counter = 0
 					if isBegin == false {
 						_, err = conn.Exec(`BEGIN;`)
@@ -441,6 +444,14 @@ func (s *SqliteHandle) Start() {
 								s.Error = fmt.Errorf("Err TX Exec: ", err)
 							}
 						}
+					default:
+						idata := make([]interface{}, 0)
+						for i = 0; i < len(data); i++ {
+							idata = append(idata, interface{}(data[i]))
+						}
+						if _, err = stmt.Exec(idata...); err != nil {
+							s.Error = fmt.Errorf("Err TX Exec: ", err)
+						}
 					}
 					counter++
 					// periodically commit when every 1000 record
@@ -458,6 +469,12 @@ func (s *SqliteHandle) Start() {
 
 		}(i)
 	}
+
+	// wait-to-exit routine
+	go func() {
+		s.WaitQuit.Wait()
+		s.Quit <- true
+	}()
 }
 
 func (s *SqliteHandle) Stop() {

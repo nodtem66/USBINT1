@@ -10,6 +10,7 @@ const (
 
 type DataTag struct {
 	PatientId    string
+	NumChannel   int
 	Measurement  string
 	Unit         string
 	Resolution   int
