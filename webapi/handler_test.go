@@ -2,7 +2,7 @@ package webapi
 
 import (
 	"fmt"
-	"github.com/nodtem66/usbint1/webapi/config"
+	"github.com/nodtem66/usbint1/config"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

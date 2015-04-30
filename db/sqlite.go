@@ -87,6 +87,7 @@ type SqliteHandle struct {
 	TimeStamp  time.Time
 	Error      error
 	DataTag
+	done chan struct{}
 }
 
 func NewSqliteHandle() *SqliteHandle {
@@ -97,7 +98,8 @@ func NewSqliteHandle() *SqliteHandle {
 			ReferenceMax: 1,
 			SamplingRate: time.Millisecond,
 		},
-		Pipe:    make(chan []int64, LENGTH_QUEUE),
+		Pipe:    make(chan []int64),
+		done:    make(chan struct{}),
 		Quit:    make(chan bool),
 		NumTask: runtime.NumCPU(),
 	}
@@ -388,7 +390,6 @@ func (s *SqliteHandle) Start() {
 			// init local variables
 			counter := 0
 			isBegin := false
-			var timestamp int64
 
 			defer func() {
 				if isBegin {
@@ -396,61 +397,62 @@ func (s *SqliteHandle) Start() {
 						fmt.Println("Err TX Commit: ", err)
 						s.Error = fmt.Errorf("Err TX Commit: ", err)
 					}
-					//fmt.Println("END routine ", id)
 				}
 			}()
+
 			// main loop
 			for data := range s.Pipe {
-				// init transaction for counter = 0
-				if isBegin == false {
-					_, err = conn.Exec(`BEGIN;`)
-					if err != nil {
-						fmt.Println("Err TX Begin(): ", err)
-						s.Error = fmt.Errorf("Err TX Begin(): ", err)
+				select {
+				case <-s.done:
+					return
+				default:
+					// init transaction for counter = 0
+					if isBegin == false {
+						_, err = conn.Exec(`BEGIN;`)
+						if err != nil {
+							fmt.Println("Err TX Begin(): ", err)
+							s.Error = fmt.Errorf("Err TX Begin(): ", err)
+						}
+						isBegin = true
 					}
-					isBegin = true
-				}
-				timestamp = data[0]
-				data = data[1:]
 
-				// insert data
-				switch s.IdFirmware {
-				case 1:
-					if len(data) >= 2 {
-						if _, err = stmt.Exec(timestamp, data[0], data[1]); err != nil {
-							fmt.Println("Err TX Exec: ", err)
-							s.Error = fmt.Errorf("Err TX Exec: ", err)
+					// insert data
+					switch s.IdFirmware {
+					case 1:
+						if len(data) >= 3 {
+							if _, err = stmt.Exec(data[0], data[1], data[2]); err != nil {
+								fmt.Println("Err TX Exec: ", err)
+								s.Error = fmt.Errorf("Err TX Exec: ", err)
+							}
+						}
+					case 2:
+						if len(data) >= 3 {
+							if _, err = stmt.Exec(data[0], data[1], data[2]); err != nil {
+								fmt.Println("Err TX Exec: ", err)
+								s.Error = fmt.Errorf("Err TX Exec: ", err)
+							}
+						}
+					case 3:
+						if len(data) >= 13 {
+							if _, err = stmt.Exec(data[0], data[1], data[2],
+								data[3], data[4], data[5], data[6], data[7], data[8],
+								data[9], data[10], data[11], data[12]); err != nil {
+								fmt.Println("Err TX Exec: ", err)
+								s.Error = fmt.Errorf("Err TX Exec: ", err)
+							}
 						}
 					}
-				case 2:
-					if len(data) >= 2 {
-						if _, err = stmt.Exec(timestamp, data[0], data[1]); err != nil {
-							fmt.Println("Err TX Exec: ", err)
-							s.Error = fmt.Errorf("Err TX Exec: ", err)
+					counter++
+					// periodically commit when every 1000 record
+					if counter >= 1000 && isBegin == true {
+
+						if _, err = conn.Exec(`COMMIT;`); err != nil {
+							fmt.Println("Err TX Commit: ", err)
+							s.Error = fmt.Errorf("Err TX Commit: ", err)
 						}
+						counter = 0
+						isBegin = false
 					}
-				case 3:
-					if len(data) >= 12 {
-						if _, err = stmt.Exec(timestamp, data[0], data[1],
-							data[2], data[3], data[4], data[5], data[6], data[7],
-							data[8], data[9], data[10], data[11]); err != nil {
-							fmt.Println("Err TX Exec: ", err)
-							s.Error = fmt.Errorf("Err TX Exec: ", err)
-						}
-					}
-				}
-				counter++
-
-				// periodically commit when every 1000 record
-				if counter >= 1000 && isBegin == true {
-
-					if _, err = conn.Exec(`COMMIT;`); err != nil {
-						fmt.Println("Err TX Commit: ", err)
-						s.Error = fmt.Errorf("Err TX Commit: ", err)
-					}
-					counter = 0
-					isBegin = false
-
 				}
 			}
 
@@ -459,7 +461,7 @@ func (s *SqliteHandle) Start() {
 }
 
 func (s *SqliteHandle) Stop() {
-	close(s.Pipe)
+	close(s.done)
 	<-s.Quit
 }
 

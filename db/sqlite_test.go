@@ -325,7 +325,7 @@ func TestSqlite_SendOneTask(t *testing.T) {
 	sqlite.NumTask = 1
 	sqlite.Start()
 	var i int64
-	for i = 0; i < 1000; i++ {
+	for i = 0; i < 3000; i++ {
 		sqlite.Pipe <- []int64{i, 1, 0, 0}
 	}
 

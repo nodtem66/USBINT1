@@ -20,8 +20,8 @@ package main
 import (
 	"fmt"
 	"github.com/BurntSushi/toml"
+	. "github.com/nodtem66/usbint1/config"
 	. "github.com/nodtem66/usbint1/webapi"
-	. "github.com/nodtem66/usbint1/webapi/config"
 	"log"
 	"net/http"
 	"os"

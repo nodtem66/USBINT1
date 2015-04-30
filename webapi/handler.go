@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/nodtem66/usbint1/webapi/config"
+	"github.com/nodtem66/usbint1/config"
 	"io/ioutil"
 	"log"
 	"net/http"
