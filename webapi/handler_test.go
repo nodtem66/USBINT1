@@ -57,7 +57,7 @@ func TestWebApi_Index(t *testing.T) {
 		t.Errorf("Route /patient failed: code %d", w.Code)
 	}
 	//t.Log(w.Body)
-	if w.Body.String() != `{"result":["test"]}` {
+	if w.Body.String() != `{"result":["100","test"]}` {
 		t.Errorf("No Test.db inside webapi")
 	}
 
@@ -126,6 +126,14 @@ func TestWebApi_Tag(t *testing.T) {
 		t.Errorf("Error for test /patient/test/tag")
 	}
 
+	r, _ = http.NewRequest("GET", "/patient/100/tag", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `{"result":[`) {
+		t.Errorf("Error for test /patient/test/tag")
+	}
+
 	r, _ = http.NewRequest("GET", "/patient/test/tag?active", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -159,6 +167,14 @@ func TestWebApi_TagId(t *testing.T) {
 		t.Errorf("Error for test /patient/test/tag/1: %s", w.Body.String())
 	}
 
+	r, _ = http.NewRequest("GET", "/patient/100/tag/1", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `{"result":{"id":1`) {
+		t.Errorf("Error for test /patient/test/tag/1: %s", w.Body.String())
+	}
+
 	r, _ = http.NewRequest("GET", "/patient/test/tag/-1", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -184,9 +200,22 @@ func TestWebApi_Measurement(t *testing.T) {
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
 	if !strings.HasPrefix(w.Body.String(), `{"result":[`) {
-		t.Errorf("Error for test /patient/test/tag/1")
+		t.Errorf("Error for test /patient/test/mnt")
 	}
-	t.Log(w.Body)
+	r, _ = http.NewRequest("GET", "/patient/100/mnt", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `{"result":[`) {
+		t.Errorf("Error for test /patient/100/mnt")
+	}
+	r, _ = http.NewRequest("GET", "/patient/100/mnt/oxigen_sat_1", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `{"result":{"name":"oxigen_sat_1","`) {
+		t.Errorf("Error for test /patient/100/mnt/oxigen_sat_1")
+	}
 	r, _ = http.NewRequest("GET", "/patient/test/mnt/", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -266,6 +295,15 @@ func TestWebApi_MeasurementQuery(t *testing.T) {
 	if !strings.HasPrefix(w.Body.String(), `{"result":[{"time":`) {
 		t.Fatal(w.Body)
 	}
+
+	r, _ = http.NewRequest("GET", "/patient/100/mnt/oxigen_sat_1?limit=1&ch=led1,led2", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `{"result":[{"led1":`) {
+		t.Fatal(w.Body)
+	}
+	t.Log(w.Body)
 
 	r, _ = http.NewRequest("GET", "/patient/test/mnt/general_1?limit=1&ch=sync", nil)
 	w = httptest.NewRecorder()

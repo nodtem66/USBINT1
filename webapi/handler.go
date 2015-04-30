@@ -137,12 +137,17 @@ func (h *APIHandler) GetTags(w http.ResponseWriter, r *http.Request, ps httprout
 	// no query string
 	var rows *sql.Rows
 	if len(query) == 0 {
-		rows, err = conn.Query("SELECT * FROM tag LIMIT 50")
+		rows, err = conn.Query(`SELECT id,mnt,unit,resolution,ref_min,
+			ref_max,sampling_rate,descriptor,num_channel,active FROM tag LIMIT 50`)
 	} else { // if query string
 		if _, ok := query["active"]; ok {
-			rows, err = conn.Query("SELECT * FROM tag WHERE active=1 LIMIT 50")
+			rows, err = conn.Query(`SELECT id,mnt,unit,resolution,ref_min,
+			ref_max,sampling_rate,descriptor,num_channel,active 
+			FROM tag WHERE active=1 LIMIT 50`)
 		} else if _, ok := query["inactive"]; ok {
-			rows, err = conn.Query("SELECT * FROM tag WHERE active=0 LIMIT 50")
+			rows, err = conn.Query(`SELECT id,mnt,unit,resolution,ref_min,
+			ref_max,sampling_rate,descriptor,num_channel,active
+			FROM tag WHERE active=0 LIMIT 50`)
 		}
 	}
 	// report query error
@@ -204,7 +209,9 @@ func (h *APIHandler) GetTag(w http.ResponseWriter, r *http.Request, ps httproute
 	defer conn.Close()
 
 	result := Tag{}
-	if err = conn.QueryRow("SELECT * FROM tag WHERE id = ?", tagId).Scan(&result.Id,
+	if err = conn.QueryRow(
+		`SELECT id,mnt,unit,resolution,ref_min,ref_max,sampling_rate,
+		descriptor,num_channel,active FROM tag WHERE id = ?`, tagId).Scan(&result.Id,
 		&result.Mnt, &result.Unit, &result.Resolution,
 		&result.RefMin, &result.RefMax, &result.SamplingRate,
 		&result.Description, &result.NumChannel, &result.Active); err != nil {
@@ -298,7 +305,7 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		err0 = fmt.Errorf("invalid measurement unit")
 		return
 	}
-	tagId := sp[1]
+	tagId := sp[len(sp)-1]
 
 	// check valid patient id
 	dbFileName := path.Join(h.Conf.DB.Path, patientId+".db")
@@ -331,7 +338,7 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		// query channel_name
 		var jsonDesc string
 		if err := conn.QueryRow(
-			`SELECT descriptor  FROM tag WHERE id = ?`, tagId,
+			`SELECT descriptor FROM tag WHERE id = ?`, tagId,
 		).Scan(&jsonDesc); err != nil {
 			err0 = err
 			return

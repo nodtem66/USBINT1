@@ -387,11 +387,12 @@ int get_firmware_id(uint8_t im, uint8_t ip)
         mnt.ref_max = 3.3;
         mnt.resolution = 4194304;
         mnt.num_channel = 2;
+        mnt.sampling_rate = 1000;
         mnt.descriptor = (char**)malloc(sizeof(intptr_t)*2);
         sprintf(mnt.name, "oxigen_sat");
         sprintf(mnt.unit, "mV");
-        SET_STR(mnt.descriptor[0], "LED2");
-        SET_STR(mnt.descriptor[1], "LED1");
+        SET_STR(mnt.descriptor[0], "LED1");
+        SET_STR(mnt.descriptor[1], "LED2");
     }
     
 exit_firmware:
@@ -643,13 +644,13 @@ void init_sqlite()
     int ret_err, i;
     char *descriptor;
     descriptor = (char*)malloc(sizeof(char)*mnt.num_channel*100);
-    sprintf(descriptor, "{");
+    sprintf(descriptor, "[");
     // initialize descriptor
     for (i=0; i<mnt.num_channel-1; i++) 
     {
         sprintf(EOS(descriptor), "\"%s\", ", mnt.descriptor[i]);
     }
-    sprintf(EOS(descriptor), "\"%s\"}", mnt.descriptor[i]);
+    sprintf(EOS(descriptor), "\"%s\"]", mnt.descriptor[i]);
     //printf("descriptor: %s\n", descriptor);
     printf("[Sqlite open %s]\n", sqlite_path);
     TRY_SQLITE("open db_file failed", sqlite3_open_v2(sqlite_path, &conn,
