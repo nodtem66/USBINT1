@@ -187,7 +187,7 @@ func TestMariaDB_runSync(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 	sqlite.Stop()
-	maria.runSync("TEST")
+	maria.runSync("TEST", "./TEST.db")
 
 	// drop table tag and measurement
 	var count2 int64
@@ -222,7 +222,7 @@ func TestMariaDB_StartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer maria.Close()
-	maria.StartSyncWithPatientId(sqlite.PatientId)
+	maria.Start()
 
 	if err := sqlite.EnableMeasurement([]string{"test", "test_2"}); err != nil {
 		t.Fatal(err)

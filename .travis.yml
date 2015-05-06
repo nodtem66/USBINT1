@@ -28,4 +28,5 @@ script:
   - go test -v github.com/nodtem66/usbint1/firmware
   - go test -v github.com/nodtem66/usbint1/db
   - go test -v github.com/nodtem66/usbint1/shading
+  - go test -v github.com/nodtem66/usbint1/sync
   - cd ./c_code/usbint1 && make

@@ -8,6 +8,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/nodtem66/usbint1/db"
 	"log"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ type MariaDBHandle struct {
 	Connection *sql.DB
 	DSN        string
 	ScanRate   time.Duration
+	Root       string
 	Quit       chan struct{}
 	done       chan struct{}
 }
@@ -28,6 +30,7 @@ func NewMariaDBHandle(dsn string) *MariaDBHandle {
 		Quit:     make(chan struct{}),
 		done:     make(chan struct{}),
 		ScanRate: time.Second,
+		Root:     "./",
 	}
 	return maria
 }
@@ -111,13 +114,21 @@ func (m *MariaDBHandle) PrepareStmt(tag DataTag, newId int64) (stmt *sql.Stmt, e
 }
 
 // start worker for sychronization
-func (m *MariaDBHandle) StartSyncWithPatientId(patient string) {
+func (m *MariaDBHandle) Start() {
 	ticker := time.Tick(m.ScanRate)
 	go func() {
 		for {
 			select {
 			case <-ticker:
-				m.runSync(patient)
+				files, _ := filepath.Glob(filepath.Join(m.Root, "*.db"))
+
+				for _, file := range files {
+					patientId := filepath.Base(file)
+					patientId = patientId[0 : len(patientId)-3]
+					log.Printf("[Checking database %s]", patientId)
+					m.runSync(patientId, file)
+				}
+
 			case <-m.done:
 				m.Quit <- struct{}{}
 				return
@@ -136,9 +147,9 @@ func (m *MariaDBHandle) Close() {
 	m.Connection.Close()
 }
 
-func (m *MariaDBHandle) runSync(patientId string) {
+func (m *MariaDBHandle) runSync(patientId string, path string) {
 	// open option for sqlite db
-	dsn := fmt.Sprintf("file:%s.db?mode=rw&_busy_timeout=5000", patientId)
+	dsn := fmt.Sprintf("file:%s?mode=rw&_busy_timeout=5000", path)
 	// open sqlite connection
 	var err error
 	var sqlite *sql.DB

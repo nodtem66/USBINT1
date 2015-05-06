@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/BurntSushi/toml"
 	. "github.com/nodtem66/usbint1/config"
-	. "github.com/nodtem66/usbint1/shading"
+	. "github.com/nodtem66/usbint1/sync"
 	"log"
 	"os"
 	"os/signal"
@@ -45,9 +45,17 @@ func main() {
 	}
 
 	// create shading
-	shade := NewHandler(conf.DB.Path)
-	shade.Interval = conf.Shade.Interval.Duration
-	shade.MinimumSync = conf.Shade.MinimumSync
+	//shade := NewHandler(conf.DB.Path)
+	//shade.Interval = conf.Shade.Interval.Duration
+	//shade.MinimumSync = conf.Shade.MinimumSync
+	var err error
+	maria := NewMariaDBHandle(conf.Sync.DSN)
+	if err = maria.Connect(); err != nil {
+		log.Fatal(err)
+	}
+	defer maria.Close()
+	maria.ScanRate = conf.Sync.Interval.Duration
+	maria.Root = conf.DB.Path
 
 	// hook os signal for exit program
 	osSignal := make(chan os.Signal, 1)
@@ -57,15 +65,15 @@ func main() {
 
 	go func() {
 		for _ = range osSignal {
-			shade.Stop()
+			maria.Stop()
 			log.Printf("[Stop]")
 			done <- true
 		}
 	}()
-	log.SetPrefix("[USB_SHADE] ")
-	log.Printf("[Start Cleaning every %s] [database scaning path %s]\n",
-		conf.Shade.Interval, conf.DB.Path)
-	shade.Start()
+	log.SetPrefix("[USB_SYNC] ")
+	log.Printf("[Start sync every %s] [database scaning path %s]\n",
+		conf.Sync.Interval.Duration, conf.DB.Path)
+	maria.Start()
 
 	//wait for exit signal
 	<-done

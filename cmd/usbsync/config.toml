@@ -28,4 +28,4 @@ interval = "10s"
 # [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 # mysql_dsn = "/db_name"
 # mysql_dsn = "root:root@tcp(192.168.59.103:3306)/department1"
-mysql_dsn = "/db_name"
+mysql_dsn = "root:root@tcp(192.168.59.103:3306)/department1"

@@ -3,7 +3,12 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 
 ## Test OS
 * ARM6 (Raspberry Pi)
+* Window7 64bit 
 
+## Requirements
+* **libusb-1.0**
+  For Windows, [Zadig](http://zadig.akeo.ie/) is recommended for install libusb-based driver
+  
 ## Directory
 * `cmd`:
   command line programs to run daemon
@@ -16,6 +21,8 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
   the current db engine is sqlite3
 * `shading`:
   the set of shading package to minimize size of database file after synchronization
+* `sync`:
+  worker for sqlite3-mariadb synchronization
 * `config`:
   an model of configuration file used globally in `usbapi`, `usbsync`, and `usbshad`
 
