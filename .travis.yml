@@ -19,6 +19,7 @@ install:
   - go get -t -v github.com/julienschmidt/httprouter
   - go get -t -v github.com/mattn/go-sqlite3
   - go get -t -v github.com/peterh/liner
+  - go get -t -v github.com/go-sql-driver/mysql
   - rm -rf $GOPATH/src/github.com/kylelemons/gousb
   - git clone https://github.com/nodtem66/gousb $GOPATH/src/github.com/kylelemons/gousb
 
