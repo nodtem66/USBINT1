@@ -48,7 +48,6 @@ func TestWebApi_Index(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Route / failed: code %d", w.Code)
 	}
-	t.Log(w.Body)
 
 	r, _ = http.NewRequest("GET", "/patient", nil)
 	w = httptest.NewRecorder()
@@ -213,6 +212,7 @@ func TestWebApi_Measurement(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
+	t.Log(w.Bodyx)
 	if !strings.HasPrefix(w.Body.String(), `{"result":{"name":"oxigen_sat_1","`) {
 		t.Errorf("Error for test /patient/100/mnt/oxigen_sat_1")
 	}

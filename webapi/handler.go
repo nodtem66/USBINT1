@@ -71,7 +71,15 @@ func New() *APIHandler {
 // Index page print program name and version
 func (h *APIHandler) Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	fmt.Fprintf(w, "USBAPI [Version: %s] [Commit: %s]", h.Version, h.Commit)
+	fmt.Fprintf(w, "USBAPI [Version: %s] [Commit: %s]\n\n", h.Version, h.Commit)
+	fmt.Fprintf(w, `### Api ###
+/patient
+/patient/:patientId/tag
+/patient/:patientId/tag?query
+/patient/:patientId/tag/:tagId
+/patient/:patientId/mnt</li>
+/patient/:patientId/mnt/:mntId
+/patient/:patientId/mnt/:mntId?limit=100&ch=ch1,ch2&before=10s&after=11ns&orderby=asc`)
 }
 
 // Handler for /patient
@@ -305,7 +313,14 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		err0 = fmt.Errorf("invalid measurement unit")
 		return
 	}
-	tagId := sp[len(sp)-1]
+
+	var tagId int64
+	if id, err := strconv.ParseInt(sp[len(sp)-1], 10, 64); err != nil {
+		err0 = err
+		return
+	} else {
+		tagId = int64(id)
+	}
 
 	// check valid patient id
 	dbFileName := path.Join(h.Conf.DB.Path, patientId+".db")

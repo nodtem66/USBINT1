@@ -78,7 +78,6 @@ type SqliteData []int64
 type SqliteHandle struct {
 	Connection *sql.DB
 	DBName     string
-	IdTag      int64
 	IdFirmware int
 	Pipe       chan []int64
 	Quit       chan bool

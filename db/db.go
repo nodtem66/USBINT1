@@ -9,6 +9,7 @@ const (
 )
 
 type DataTag struct {
+	IdTag        int64
 	PatientId    string
 	NumChannel   int
 	Measurement  string
@@ -16,6 +17,7 @@ type DataTag struct {
 	Resolution   int
 	ReferenceMin float64
 	ReferenceMax float64
+	Descriptor   []string
 	SamplingRate time.Duration
 }
 
