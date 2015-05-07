@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html ng-app>
+  <head>
+  <title>Vital Sign Monitoring</title>
+
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link href="css/font-awesome.min.css" media="screen" rel="stylesheet" />
+  <link href="css/application.css" rel="stylesheet" />
+  <link href="css/main.css" rel="stylesheet" />
+  <script type="text/javascript" src="js/jquery.min.js"></script>
+  <script type='text/javascript' src="js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+  <script type="text/javascript" src="js/angular-1.0.7.min.js"></script>
+  <script src="js/application.js"></script>
+  
+
+</head>
+
+<body>
+
+    <div id="wrap">
+      <div class="navbar navbar-inverse navbar-default navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header navbar-right">
+      
+        <font color = "white" size="7">Comments</font>
+      </div>
+      <ul class="nav navbar-nav navbar-left">
+            <li><a href="index.html"><font size ="4">Home</font></a></li>
+            <li><a href="mnt.html"><font size ="4">Channel</font></a></li>
+            <li><a href="record.html"><font size ="4">Record</font></a></li>
+            <li><a href="wall.html"><font size ="4">Comment</font></a></li>
+      </ul>
+    
+  </div>
+</div>
+<div class="row">
+
+  <div id="list-patient" class="col-xs-12 col-sm-12-offset-1">
+        <div id="dv1">
+            <form ng-controller="FrmController">
+                <font color="white"><b>Post your Comment</b></font>
+                <form ng-controller="FrmController">
+                    <textarea ng-model="txtcomment" placeholder="Your Comment" style='width:750px'></textarea>
+                    <button ng-click='btn_add();' style='margin-top:10px;'><b>Post Comment</b></button>
+ 
+                    <h4><b>Comments</b></h4>
+                    <ul>
+                        <li ng-repeat="comnt in comment"> <font color="white" size="5">{{ comnt }}</font> <a  style="float: right;" href="" ng-click="remItem($index)">x</a></li>
+                    </ul>
+                </form> 
+          </div>      
+        </div>
+ </div>
+
+        
+
+
+
+  
+   <script type="text/javascript">
+            function FrmController($scope) {
+                $scope.comment = [];
+                $scope.btn_add = function() {
+                    if($scope.txtcomment !=''){
+                    $scope.comment.push($scope.txtcomment);
+                    $scope.txtcomment = "";
+                    }
+                }
+ 
+                $scope.remItem = function($index) {
+                    $scope.comment.splice($index, 1);
+                }
+            }
+        </script>
+
+
+  
+
+  </body>
+</html>
+
