@@ -13,6 +13,7 @@ before_install:
   - pkg-config --modversion libusb-1.0
   - cd ../ && rm libusb-1.0.19.tar.gz && rm -rf libusb-1.0.19/
   - mysql -e "CREATE DATABASE IF NOT EXISTS department1;" -u root
+  - mysql -e "grant all privileges on *.* to 'root'@'localhost' identified by 'root' with grant option" -u root
 
 install:
   - go get -t -v github.com/BurntSushi/toml
