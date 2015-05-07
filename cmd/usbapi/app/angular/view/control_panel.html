@@ -1,0 +1,91 @@
+<!--
+<div class="row">
+	<div class="col-xs-12">
+		<div class="alert alert-dismissable alert-material-blue-grey">
+			<button class="close" type="button" data-dismiss="alert">x</button>
+			<p><strong>Control PanelBlueprint </strong> is a template for a the evaluation (assessment).
+				This building-block can be used as many as you want to create the multiple assessment. 
+				<b>Note that the result assessments cannot affect the parent blueprint after they're edited</b></p>
+			<p><a href="#" class="alert-link">Best Practice to design the blueprint</a> is "design once use everywhere".
+				Try to use the <b>parameters</b> for a flexible customization.</p>
+		</div>
+	</div>
+</div>
+-->
+<!-- Log config page -->
+<div ng-show="config_page=='log'">
+<div class="row"><div class="col-xs-12"><h1>Log</h1></div></div>
+<div class="row">
+	<div class="col-xs-12" ng-hide="log_content.length > 0">
+		<pre>NO LOG</pre>
+	</div>
+	<div class="col-xs-12" ng-show="log_content.length > 0">
+		<pre>{{ log_content }}</pre>
+	</div>
+</div>
+</div>
+
+<!-- Setting config page -->
+<div ng-show="config_page=='setting'">
+<div class="row"><div class="col-xs-12"><h1>Setting</h1></div></div>
+<div class="row">
+	<div class="col-xs-12">
+		<form class="form-horizontal">
+		<div class="well" style="background: #eee">
+				<fieldset>
+					<legend>Device</legend>
+					<div class="form-group">
+						<label for="inputName" class="control-label col-xs-2">Name</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputName" placeholder="Name of Monitoring Platform"></div>
+						<div class="col-xs-4"><span class="help-block">Set the name of this device for provide the additional human-readable information<br>e.g. Device1, M1</span></div>
+					</div>
+					<div class="form-group">
+						<label for="inputOrg" class="control-label col-xs-2">Organization</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputOrg" placeholder="Name of Group e.g. department1"></div>
+						<div class="col-xs-4"><span class="help-block">Set the organization name<br>e.g. department1</span></div>
+					</div>
+					<div class="form-group">
+						<label for="inputDesc" class="control-label col-xs-2">Description</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputDesc" placeholder="Additional description for Monitoring Platform"></div>
+						<div class="col-xs-4"><span class="help-block">Set the additional infomation (comment) for this device</span></div>
+					</div>
+				</fieldset>
+		</div>
+		<div class="well" style="background: #eee">
+				<fieldset>
+					<legend>Advance Settings</legend>
+					<div class="form-group">
+						<label for="inputDBPath" class="control-label col-xs-2">Database Path (Folder)</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputDBPath" placeholder="Relative/full path for store local database file"></div>
+						<div class="col-xs-4"><span class="help-block">Path to store the local database<br>e.g. D:/data <br>./data/</span></div>
+					</div>
+					<div class="form-group">
+						<label for="inputSyncTime" class="control-label col-xs-2">Shading Interval</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputSyncTime" placeholder="Name of Monitoring Platform"></div>
+						<div class="col-xs-4"><span class="help-block">input the time in which the program start compact local database file (minimize file size)<br>e.g. 10s (10 second)<br>1ms (1 millisecond)<br>Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h"</span></div>
+					</div>
+					<div class="form-group">
+						<label for="inputShadTime" class="control-label col-xs-2">Sync Interval</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputShadTime" placeholder="Name of Monitoring Platform"></div>
+						<div class="col-xs-4"><span class="help-block">input the time in which the program start synchronization data to external server<br>e.g. 10m (10 minute)<br>1h (1 hour)<br>1h10m (1 hour and 10 minutes)</span></div>
+					</div>
+					<div class="form-group">
+						<label for="inputLogFile" class="control-label col-xs-2">Log File</label>
+						<div class="col-xs-6"><input type="text" class="form-control" id="inputLogFile" placeholder="log file"></div>
+						<div class="col-xs-4"><span class="help-block">the output for service will be stored in this file<br>e.g. usbapi.log</span></div>
+					</div>
+				</fieldset>
+		</div>
+		</form>
+		</div>
+	</div>
+	<div class="row">
+		<div class="col-xs-3">
+			<button class="btn btn-default" style="background-color: #DDD;">Cancel</button>
+			<button type="submmit" class="btn btn-primary">Save</button>
+		</div>
+	</div>
+</div>
+</div>
+
+<script>$.material.init()</script>
