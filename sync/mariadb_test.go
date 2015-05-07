@@ -11,7 +11,7 @@ import (
 
 // Data Source Name
 // [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
-const DSN = "root:root@tcp(192.168.59.103:3306)/department1"
+const DSN = "root:root@tcp(127.0.0.1:3306)/department1"
 
 func TestMariaDB_Connect(t *testing.T) {
 	var err error
