@@ -41,12 +41,13 @@ type MeasurementDescriptor struct {
 func NewAPIRouter(h *APIHandler) *httprouter.Router {
 	// config the router
 	router := httprouter.New()
-	router.GET("/", h.Index)
+	router.GET("/version", h.HelpPage)
 	router.GET("/patient", h.GetPatients)
 	router.GET("/patient/:patientId/tag", h.GetTags)
 	router.GET("/patient/:patientId/tag/:tagId", h.GetTag)
 	router.GET("/patient/:patientId/mnt", h.GetMeasurements)
 	router.GET("/patient/:patientId/mnt/:mntId", h.GetMeasurement)
+	router.NotFound = http.FileServer(http.Dir("app/")).ServeHTTP
 	return router
 }
 
@@ -69,7 +70,7 @@ func New() *APIHandler {
 }
 
 // Index page print program name and version
-func (h *APIHandler) Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *APIHandler) HelpPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprintf(w, "USBAPI [Version: %s] [Commit: %s]\n\n", h.Version, h.Commit)
 	fmt.Fprintf(w, `### Api ###

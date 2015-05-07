@@ -2,9 +2,14 @@ language: go
 go:
   - tip
 before_install:
+  - sudo service mysql stop
   - sudo rm /etc/apt/sources.list.d/*.list
+  - sudo apt-get install python-software-properties
+  - sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xcbcb082a1bb943db
+  - sudo add-apt-repository 'deb http://ftp.kaist.ac.kr/mariadb/repo/10.0/ubuntu precise main'
   - sudo apt-get update -q
-  - sudo apt-get install -y build-essential libudev-dev
+  - sudo apt-get install -y build-essential libudev-dev mariadb-server
+  - mysql -e "CREATE DATABASE IF NOT EXISTS department1;" -u root
   - wget https://github.com/libusb/libusb/archive/v1.0.19.tar.gz -O libusb-1.0.19.tar.gz
   - tar -zxvf libusb-1.0.19.tar.gz
   - cd libusb-1.0.19 && ./autogen.sh && ./configure --prefix=/usr && make && sudo make install

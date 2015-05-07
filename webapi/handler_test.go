@@ -42,7 +42,7 @@ func TestWebApi_Index(t *testing.T) {
 		rw.WriteHeader(404)
 	}
 
-	r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/version", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != 200 {
@@ -212,7 +212,7 @@ func TestWebApi_Measurement(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
-	t.Log(w.Bodyx)
+	t.Log(w.Body)
 	if !strings.HasPrefix(w.Body.String(), `{"result":{"name":"oxigen_sat_1","`) {
 		t.Errorf("Error for test /patient/100/mnt/oxigen_sat_1")
 	}
@@ -320,4 +320,21 @@ func TestWebApi_MeasurementQuery(t *testing.T) {
 	if !strings.HasPrefix(w.Body.String(), `{"err":"`) {
 		t.Fatal(w.Body)
 	}
+}
+
+func TestWebApi_ServerFile(t *testing.T) {
+	globalHandler.Conf = &conf
+	router := NewAPIRouter(globalHandler)
+
+	r, _ := http.NewRequest("GET", "/example.html", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	if !strings.HasPrefix(w.Body.String(), `Hello from example.html`) {
+		t.Fatal(w.Body)
+	}
+	r, _ = http.NewRequest("GET", "/index.html", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertNotEqual(t, 200, w.Code)
 }
