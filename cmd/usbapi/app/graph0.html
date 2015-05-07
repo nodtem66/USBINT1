@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <title>Vital Sign Monitoring</title>
+
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link href="css/font-awesome.min.css" media="screen" rel="stylesheet" />
+  <link href="css/application.css" rel="stylesheet" />
+  <link href="css/main.css" rel="stylesheet" />
+  <script type="text/javascript" src="js/jquery.min.js"></script>
+  <script type='text/javascript' src="js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+ <script type="text/javascript" src="js/canvasjs.min.js" defer></script>
+
+</head>
+
+<body>
+
+    <div id="wrap">
+      <div class="navbar navbar-inverse navbar-default navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header navbar-right">
+      
+        <font color = "white" size="7">Monitor</font>
+      </div>
+      <ul class="nav navbar-nav navbar-left">
+            <li><a href="index.html"><font size ="4">Home</font></a></li>
+            <li><a href="graph.html"><font size ="4">Channel</font></a></li>
+            <li><a href="record.html"><font size ="4">Record</font></a></li>
+            <li><a href="wall.html"><font size ="4">Comment</font></a></li>
+      </ul>
+  </div>
+</div>
+<div id="chartContainer" style="height: 650px; width:100%;">
+
+</div>
+
+
+
+  
+  <script type="text/javascript">
+  window.onload = function () {
+          $.getJSON('http://localhost:8080/patient/ecg/mnt/ecg_1?limit=10000&ch=lead_II', function(data) {
+            console.log(data);
+            if (status != "success") {
+              console.log("error");
+            }
+
+            if (data['err']) {
+              // TODO: error handing
+              console.log(data['err']);
+              return;
+            }
+
+            if (!data['result']) {
+              return;
+            }
+
+            var result = data.result;
+            for (var i=0, len=result.length; i < len; i++)
+            {
+              var ch='lead_II';
+              result[i].x = result[i].time;
+              result[i].y = result[i][ch];
+            
+            }
+
+      var finalDps = data.result;
+      var dps = []; // dataPoints
+
+      var chart = new CanvasJS.Chart("chartContainer",{
+        zoomEnabled:true,
+        //backgroundColor: "#000000",
+
+        title :{
+        text: "ECG Lead_II",
+        //fontColor: "white",
+
+        },
+        axisX:{
+          //lineColor: "white",
+          
+        },     
+        axisY:{
+         // lineColor: "white",
+          
+         minimum : 16752250
+        },      
+        data: [{
+          type: "line",
+          xValueType: "dateTime",
+
+          dataPoints: dps 
+        }]
+      });
+
+      var xVal = 0;
+      var updateInterval = 10;
+      var dataLength = 6000; // number of dataPoints visible at any point
+
+      var updateChart = function (count) {
+        count = count || 1;
+        // count is number of times loop runs to generate random dataPoints.
+        
+        for (var j = 0; j < count; j++) { 
+          yVal = finalDps[xVal].y;
+          dps.push({
+            x: xVal,
+            y: yVal
+          });
+          xVal++;
+        };
+        if (dps.length > dataLength)
+        {
+          dps.shift();        
+        }
+        
+        chart.render();   
+
+      };
+
+      // generates first set of dataPoints
+      updateChart(dataLength); 
+
+      // update chart after specified time. 
+      setInterval(function(){updateChart()}, updateInterval); 
+
+    })
+    .fail(function(jqxhr, textStatus, error) {
+      var err = textStatus + ', ' + error;
+      alert("request failed: " + err);
+    });
+    
+
+  }
+  $(".canvasjs-chart-credit").hide()
+  </script>
+
+
+
+ 
+
+  </body>
+</html>
