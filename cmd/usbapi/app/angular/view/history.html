@@ -1,0 +1,63 @@
+
+<style>@import url(css/jquery.dropdown.css);</style>
+
+<div class="row">
+	<div class="col-xs-12">
+		<h1><i class="mdi-action-history"></i> Patient History</h1>
+	</div>
+</div>
+
+<form class="form-horizontal">
+<div class="row">
+	<fieldset>
+	<div class="form-group">
+		<label for="inputPatientId" class="control-label col-xs-2" style="color:#ddd">PatientId</label>
+		<div class="col-xs-4">
+			<select name="inputPatientId" id="inputPatientId" class="form-control" data-dropdownjs="true">
+				<option value="paitneit1">paitnet1</option>
+				<option value="paitneit2">paitnet2</option>
+				<option value="paitneit3">paitnet3</option>
+				<option value="paitneit4">paitnet4</option>
+				<option value="paitneit5">paitnet5</option>
+			</select>
+		</div>
+	</div>
+	<div class="form-group">
+		<label for="inputMeasurement" class="control-label col-xs-2" style="color:#ddd">Measurement</label>
+		<div class="col-xs-4">
+			<select name="inputMeasurement" id="inputMeasurement" class="form-control">
+				<option value="paitneit1">paitnet1</option>
+				<option value="paitneit2">paitnet2</option>
+				<option value="paitneit3">paitnet3</option>
+				<option value="paitneit4">paitnet4</option>
+				<option value="paitneit5">paitnet5</option>
+			</select>
+		</div>
+	</div>
+	<div class="form-group">
+		<label for="inputPatientId" class="control-label col-xs-2" style="color:#ddd">Time</label>
+		<div class="col-xs-4">
+			<div id="time-slider" class="shor slider-material-blue"></div>
+		</div>
+	</div>
+	<div class="form-group">
+		<div class="col-xs-1 col-xs-offset-2">Start time:</div>
+		<div class="col-xs-2">0110010101ns</div>
+	</div>
+	<div class="form-group">
+		<div class="col-xs-1 col-xs-offset-2">End time:</div>
+		<div class="col-xs-2">0110010101ns</div>
+	</div>
+	<div class="form-group">
+		<div class="col-xs-offset-2 col-xs-4"><button class="btn btn-primary">Query</button></div>
+	</div>
+	<fieldset>
+</div>
+<div class="row">
+	<div class="col-xs-12"></div>
+</div>
+</form>
+<script>
+	$.material.init();
+	$('#time-slider').noUiSlider({start: [0, 500], connect: true, range: {'min':0,'max':1000}});
+</script>
