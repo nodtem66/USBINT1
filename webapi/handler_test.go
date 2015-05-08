@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 var globalHandler = New()
@@ -337,4 +339,72 @@ func TestWebApi_ServerFile(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	assertNotEqual(t, 200, w.Code)
+}
+
+func TestWebApi_SystemStatus(t *testing.T) {
+	globalHandler.Conf = &conf
+	router := NewAPIRouter(globalHandler)
+
+	r, _ := http.NewRequest("GET", "/sys/ip_addr", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	t.Log(w.Body)
+	r, _ = http.NewRequest("GET", "/sys/list_process", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	t.Log(w.Body)
+	r, _ = http.NewRequest("GET", "/sys/list_usb", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	t.Log(w.Body)
+}
+
+func TestWindow_GetIP(t *testing.T) {
+	if name, err := GetIP(); err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(name)
+	}
+}
+
+func TestWindow_IsProcessRunning(t *testing.T) {
+	if isRun, err := IsProcessRunning("chrome"); err != nil {
+		t.Fatal(err)
+	} else {
+		assertEqual(t, isRun, true)
+	}
+	if isRun, err := IsProcessRunning("usbint"); err != nil {
+		t.Fatal(err)
+	} else {
+		assertEqual(t, isRun, false)
+	}
+}
+
+func TestWindow_ListUSB(t *testing.T) {
+	if jsonStr, err := ListUsbDevice(); err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(jsonStr)
+	}
+}
+
+func TestWindow_StartBGProcess(t *testing.T) {
+	if cmd, out, err := StartProcess("proxy.bat", "test001"); err != nil {
+		t.Fatal(err)
+	} else {
+		time.Sleep(time.Millisecond * 100)
+		if proc := cmd.Process; proc != nil {
+			t.Log(proc.Pid)
+			if err := proc.Signal(os.Interrupt); err == nil {
+				t.Log(out.Len())
+			} else {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatal("nil proc")
+		}
+	}
 }

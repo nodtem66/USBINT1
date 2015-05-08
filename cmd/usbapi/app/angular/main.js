@@ -5,7 +5,7 @@ app.controller('AppController', ['$rootScope', '$location', function($scope, $lo
 	$scope.version = '0.1.0';
 	$scope.update_time = '2015-4-12';
 	$scope.isPageLoad = false;
-	$scope.config_page = 'setting';
+	$scope.config_page = '';
 	$scope.isActive = function(path) {
 		var valid_path = $location.path();
 		if (valid_path == path) {
@@ -15,7 +15,6 @@ app.controller('AppController', ['$rootScope', '$location', function($scope, $lo
 	};
 	this.gotoConfigPage = function (page) {
 		$scope.config_page = page;
-		console.log(page);
 	};
 	//$.material.init();
 }]);
@@ -23,19 +22,27 @@ app.controller('ControlPanelController', ['$scope', function($scope) {
 	$scope.log_content = "test test test";
 }]);
 
-app.controller('WelcomeController', ['$rootScope', function($rootScope) {
+app.controller('DashboardController', ['$rootScope', function($rootScope) {
+
+}]);
+
+app.controller('HistoryController', ['$scope', function($scope) {
 
 }]);
 
 app.config(['$routeProvider', function($routeProvider, $locationProvider) {
 	$routeProvider.
 		when('/', {
-			templateUrl: 'angular/view/welcome.html',
-			controller: 'WelcomeController as w'
+			templateUrl: 'angular/view/dash_board.html',
+			controller: 'DashboardController as d'
 		}).
 		when('/control_panel', {
 			templateUrl: 'angular/view/control_panel.html',
 			controller: 'ControlPanelController as c'
+		}).
+		when('/history', {
+			templateUrl: 'angular/view/history.html',
+			controller: 'HistoryController as h'
 		});
 }]);
 

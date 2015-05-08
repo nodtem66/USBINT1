@@ -14,7 +14,7 @@
 -->
 <!-- Log config page -->
 <div ng-show="config_page=='log'">
-<div class="row"><div class="col-xs-12"><h1>Log</h1></div></div>
+<div class="row"><div class="col-xs-12"><h1>System Log</h1></div></div>
 <div class="row">
 	<div class="col-xs-12" ng-hide="log_content.length > 0">
 		<pre>NO LOG</pre>
@@ -26,8 +26,8 @@
 </div>
 
 <!-- Setting config page -->
-<div ng-show="config_page=='setting'">
-<div class="row"><div class="col-xs-12"><h1>Setting</h1></div></div>
+<div id="setting-page" ng-show="config_page=='setting'">
+<div class="row"><div class="col-xs-12"><h1>System Setting</h1></div></div>
 <div class="row">
 	<div class="col-xs-12">
 		<form class="form-horizontal">

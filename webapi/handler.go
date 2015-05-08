@@ -3,12 +3,15 @@ package webapi
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
+	"github.com/kylelemons/gousb/usb"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nodtem66/usbint1/config"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,6 +50,7 @@ func NewAPIRouter(h *APIHandler) *httprouter.Router {
 	router.GET("/patient/:patientId/tag/:tagId", h.GetTag)
 	router.GET("/patient/:patientId/mnt", h.GetMeasurements)
 	router.GET("/patient/:patientId/mnt/:mntId", h.GetMeasurement)
+	router.GET("/sys/:option", h.GetSystemStatus)
 	router.NotFound = http.FileServer(http.Dir("app/")).ServeHTTP
 	return router
 }
@@ -432,6 +436,52 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 	}
 }
 
+// helper api for system status
+// /sys/ip_addr: list all ip addresses of this device
+// /sys/list_usb: list usb device
+// /sys/list_process: list firmware backend process
+func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var err0 error
+	ret := map[string]interface{}{}
+	defer func() {
+		if err0 != nil {
+			ret["err"] = err0.Error()
+		}
+		jsonByte, _ := json.Marshal(ret)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		fmt.Fprint(w, string(jsonByte))
+	}()
+	option := ps.ByName("option")
+	switch option {
+	case "ip_addr":
+		if names, err := GetIP(); err != nil {
+			err0 = err
+			return
+		} else {
+			ret["result"] = names
+		}
+	case "list_process":
+		status := map[string]bool{"usbshad": false, "usbsync": false}
+		var err error
+		for processName, _ := range status {
+			if status[processName], err = IsProcessRunning(processName); err != nil {
+				err0 = err
+				return
+			}
+		}
+		ret["result"] = status
+	case "list_usb":
+		if jsonStr, err := ListUsbDevice(); err != nil {
+			err0 = err
+			return
+		} else {
+			ret["result"] = jsonStr
+		}
+	default:
+		err0 = fmt.Errorf("path %s not found", option)
+	}
+}
+
 func (h *APIHandler) Close() {
 
 }
@@ -540,4 +590,88 @@ func ParseMeasurementQL(query url.Values) *MeasurementQL {
 		}
 	}
 	return mql
+}
+
+// modified from:
+// http://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
+// and http://play.golang.org/p/BDt3qEQ_2H
+func GetIP() ([]string, error) {
+	ips := []string{}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue // interface down
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue // loopback interface
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue // not an ipv4 address
+			}
+			ips = append(ips, ip.String())
+		}
+	}
+	if len(ips) == 0 {
+		return nil, errors.New("are you connected to the network?")
+	} else {
+		return ips, nil
+	}
+}
+
+func ListUsbDevice() (jsonStr string, err error) {
+	context := usb.NewContext()
+	defer context.Close()
+	var devices []*usb.Device
+	var jsonByte []byte
+	devices, err = context.ListDevices(func(desc *usb.Descriptor) bool {
+		if desc.Vendor == usb.ID(0x10c4) && desc.Product == usb.ID(0x8a40) {
+			return true
+		}
+		return false
+	})
+	if err != usb.ERROR_NOT_FOUND {
+		return
+	}
+	if len(devices) == 0 {
+		err = errors.New("no devices")
+	}
+	devMap := make([]map[string]string, 0)
+	for _, dev := range devices {
+		defer dev.Close()
+
+		mymap := make(map[string]string)
+		if mymap["manufacturer"], err = dev.GetStringDescriptor(1); err != nil {
+			return
+		}
+		if mymap["product"], err = dev.GetStringDescriptor(2); err != nil {
+			return
+		}
+		mymap["vid"] = fmt.Sprintf("%X", int(dev.Vendor))
+		mymap["pid"] = fmt.Sprintf("%X", int(dev.Product))
+		mymap["bus_address"] = fmt.Sprintf("%d:%d", dev.Bus, dev.Address)
+		devMap = append(devMap, mymap)
+	}
+	if jsonByte, err = json.Marshal(devMap); err == nil {
+		jsonStr = string(jsonByte)
+	}
+	return
 }
