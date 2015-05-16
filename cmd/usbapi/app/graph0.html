@@ -40,7 +40,7 @@
   
   <script type="text/javascript">
   window.onload = function () {
-          $.getJSON('http://localhost:8080/patient/ecg/mnt/ecg_1?limit=10000&ch=lead_II', function(data) {
+          $.getJSON('http://localhost:8080/patient/ecg/mnt/ecg_1?limit=10000&ch=lead_II&order=desc', function(data) {
             console.log(data);
             if (status != "success") {
               console.log("error");
@@ -83,8 +83,9 @@
         },     
         axisY:{
          // lineColor: "white",
+         includeZero: false,
           
-         minimum : 16752250
+         //minimum : 16752250
         },      
         data: [{
           type: "line",
