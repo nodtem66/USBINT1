@@ -119,14 +119,17 @@ static char db_filename[100];
 static char sqlite_path[100];
 static measurement_t mnt;
 static struct timespec time1;
+
+// argument option
 static int createNewDBFile = 0;
+static uint8_t devBus = 0;
+static uint8_t devAddress = 0;
 
 // management and pthread
 static volatile int do_exit = 0;
 static int counter_wal = 0;
 pthread_mutex_t lock1_mutex;
 pthread_cond_t wal_checkout_cv;
-
 
 //------------------------------------------------------------------------------
 // function prototype
@@ -173,7 +176,7 @@ int main(int argc, char **argv)
     
     // parse argument
     if (parse_opt(argc, argv)) exit(1);
-    printf("[Patient ID %s]\n", patientID);
+    printf("[Patient ID %s] [bus: %d] [address: %d]\n", patientID, devBus, devAddress);
     
     // init usb context
     TRY_LIBUSB("initial usb context", libusb_init(NULL));
@@ -282,6 +285,10 @@ static void scan_devices()
     {
         struct libusb_device_descriptor desc;
         int r = libusb_get_device_descriptor(dev, &desc);
+        int isValidDevice = 0;
+        uint8_t dev_bus = libusb_get_bus_number(dev);
+        uint8_t dev_addr = libusb_get_device_address(dev);
+        
         if (r < 0) {
             printf("Fail to get device descriptor\n");
             return;
@@ -295,9 +302,23 @@ static void scan_devices()
             libusb_get_bus_number(dev),
             libusb_get_device_address(dev));
         */
+        // select the specific bus/address
+        if (devBus != 0 && devAddress != 0) {
+            if (desc.idVendor == ID_VENDOR && 
+                desc.idProduct == ID_PRODUCT &&
+                devBus == dev_bus &&
+                devAddress == dev_addr) 
+            {
+                isValidDevice = 1;
+            }
+        } else {
+            if (desc.idVendor == ID_VENDOR && desc.idProduct == ID_PRODUCT)
+            {
+                isValidDevice = 1;
+            }
+        }
         
-        if (desc.idVendor == ID_VENDOR && desc.idProduct == ID_PRODUCT)
-        {
+        if (isValidDevice) {
             TRY_LIBUSB2("open device", libusb_open(dev, &dev_handle));
             if (ret_err)
                 continue;
@@ -309,7 +330,7 @@ static void scan_devices()
             EP_SIZE = libusb_get_max_packet_size(dev, EP_ADDRESS);
             printf("[IO firmware %d] [open 0x%02X (%d bytes)]\n",
                 fid, EP_ADDRESS, EP_SIZE);
-            
+            break;
         }
     }
     libusb_free_device_list(devs, 1);
@@ -607,6 +628,12 @@ int parse_opt(int argc, char **argv)
         }
     }
     
+    // parse optionall devBus and devAddress
+    if (optind+2 < argc)
+    {
+        devBus = (uint8_t)(atoi(argv[optind+1]));
+        devAddress = (uint8_t)(atoi(argv[optind+2]));
+    }
     // parse patient ID
     if (optind < argc) 
     {
@@ -617,8 +644,9 @@ int parse_opt(int argc, char **argv)
             sprintf(sqlite_path, "file:%s.db?mode=rwc&cache=shared", patientID);
             return 0;
         }
-        printf("Empty patient ID\n");
     }
+    // if length arguments is 0
+    
     printf("Missing patient ID\n");
     return 1;
 }

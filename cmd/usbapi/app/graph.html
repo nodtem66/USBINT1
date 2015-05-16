@@ -40,7 +40,7 @@
   
   <script type="text/javascript">
   window.onload = function () {
-    $.getJSON('http://localhost:8080/patient/100/mnt/oxigen_sat_1?limit=10000&ch=led1', function(data, status) {
+    $.getJSON('http://localhost:8080/patient/T001/mnt/oxigen_sat_1?limit=10000&ch=led1&orderby=desc', function(data, status) {
             
             if (status != "success") {
               console.log("error");
@@ -89,7 +89,7 @@
         axisY:{
           //lineColor: "white",
           
-          minimum : 10800000000
+          minimum : 45000000000
         },      
         data: [{
           type: "line",
@@ -100,7 +100,7 @@
       });
 
       var xVal = 0;
-      var updateInterval = 10;
+      var updateInterval = 5;
       var dataLength = 3000; // number of dataPoints visible at any point
 
       var updateChart = function (count) {

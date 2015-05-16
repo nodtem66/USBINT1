@@ -6,7 +6,7 @@ organization = "Developer"
 description = "A Virtual Device for development"
 
 [database]
-path = "../usbint/"
+path = "D:\\work\\usbint"
 
 [server]
 address = ":8080"
