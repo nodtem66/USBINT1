@@ -40,7 +40,7 @@
   
   <script type="text/javascript">
   window.onload = function () {
-    $.getJSON('http://localhost:8080/patient/100/mnt/oxigen_sat_1?limit=10000&ch=led1', function(data, status) {
+    $.getJSON('http://localhost:8080/patient/100/mnt/oxigen_sat_1?limit=1000&ch=led1', function(data, status) {
             
             if (status != "success") {
               console.log("error");
@@ -67,7 +67,7 @@
               } else {
                 result[i].y = result[i][ch];
               }
-              // result[i].y = Math.abs(result[i][ch];
+              
             }
 
       var finalDps = data.result;
@@ -87,9 +87,11 @@
           
         },     
         axisY:{
-          //lineColor: "white",
           
-          minimum : 10800000000
+          //lineColor: "white",
+          includeZero: true,
+          
+          minimum : 10800000000,
         },      
         data: [{
           type: "line",

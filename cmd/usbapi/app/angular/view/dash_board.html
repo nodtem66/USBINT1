@@ -8,25 +8,25 @@
 
 <div class="row">
 	<div class="col-xs-12">
-		<div class="alert alert-dismissable alert-info">
+		<div class="alert alert-dismissable alert-info" ng-hide="names" class="ng-hide">
 			<button type="button" class="close" data-dismiss="alert">×</button>
       <strong>No Data!</strong>. There is no active record for patient monitoring module.
 		</div>
-		<div class="list-group">
-		  <div class="list-group-item">
+		<div class="list-group" ng-controller="DashboardController">
+		  <div class="list-group-item" ng-repeat="d in names">
 				<div class="row-content">
-				  <h4 class="list-group-item-heading">Tile with a label</h4>
-				  <p class="list-group-item-text">Donec id elit non mi porta gravida at eget metus.</p>
+				  <h4 class="list-group-item-heading">{{'Patient ' + $index}}</h4>
+				  <p class="list-group-item-text">{{d}}</p>
 				</div>		      
-				 <div style="position:absolute;top:0;right:16px"><button class="btn btn-primary">View</button> <button class="btn btn-warning">Stop</button></div>
+				 <div style="position:absolute;top:0;right:16px"><a href="#" class="btn btn-primary">View</a> <button class="btn btn-warning">Stop</button></div>
 		  </div>
-		  <div class="list-group-item">
+		  <!-- <div class="list-group-item">
 		    <div class="row-content">
 				  <h4 class="list-group-item-heading">Tile with a label</h4>
 				  <p class="list-group-item-text">Donec id elit non mi porta gravida at eget metus.</p>
 				</div>
 				<div style="position:absolute;top:0;right:16px"><button class="btn btn-primary">View</button> <button class="btn btn-warning">Stop</button></div>		        
-		  </div>
+		  </div> -->
 		  <button class="btn btn-info"><i class="mdi-content-add"></i> Insert</button>
 		</div>
 	</div>

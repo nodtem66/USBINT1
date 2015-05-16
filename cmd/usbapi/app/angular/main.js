@@ -22,7 +22,11 @@ app.controller('ControlPanelController', ['$scope', function($scope) {
 	$scope.log_content = "test test test";
 }]);
 
-app.controller('DashboardController', ['$rootScope', function($rootScope) {
+app.controller('DashboardController', ['$rootScope','$http', function($rootScope, $http) {
+	$http.get("http://localhost:8080/patient")
+    .success(function(data) {$rootScope.names = data.result;})
+    $http.get("http://localhost:8080/patient/names/tag")
+    
 
 }]);
 
