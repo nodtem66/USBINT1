@@ -2,18 +2,17 @@ package webapi
 
 import (
 	"fmt"
-	"github.com/nodtem66/usbint1/config"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/nodtem66/usbint1/config"
 )
 
 var globalHandler = New()
-var conf = config.TomlConfig{DB: config.Database{"./"}}
+var conf = config.TomlConfig{DB: config.Database{"./"}, Log: config.Loginfo{FileName: "./test.log"}}
 
 func assertEqual(t *testing.T, expect interface{}, actual interface{}) {
 	if expect != actual {
@@ -360,6 +359,11 @@ func TestWebApi_SystemStatus(t *testing.T) {
 	router.ServeHTTP(w, r)
 	assertEqual(t, 200, w.Code)
 	t.Log(w.Body)
+	r, _ = http.NewRequest("GET", "/sys/print_log", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	assertEqual(t, 200, w.Code)
+	t.Log(w.Body)
 }
 
 func TestWindow_GetIP(t *testing.T) {
@@ -391,20 +395,16 @@ func TestWindow_ListUSB(t *testing.T) {
 	}
 }
 
-func TestWindow_StartBGProcess(t *testing.T) {
-	if cmd, out, err := StartProcess("proxy.bat", "test001"); err != nil {
+func TestWindow_ListPidFromName(t *testing.T) {
+	if pids, err := ListPidFromName("chrome"); err != nil {
 		t.Fatal(err)
 	} else {
-		time.Sleep(time.Millisecond * 100)
-		if proc := cmd.Process; proc != nil {
-			t.Log(proc.Pid)
-			if err := proc.Signal(os.Interrupt); err == nil {
-				t.Log(out.Len())
-			} else {
-				t.Fatal(err)
-			}
-		} else {
-			t.Fatal("nil proc")
-		}
+		t.Log(pids)
+	}
+	if pids, err := ListPidFromName("usbint1"); err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(pids)
 	}
 }
+

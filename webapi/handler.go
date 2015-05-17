@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/julienschmidt/httprouter"
-	"github.com/kylelemons/gousb/usb"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/nodtem66/usbint1/config"
 	"io/ioutil"
 	"log"
 	"net"
@@ -16,8 +12,14 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/julienschmidt/httprouter"
+	"github.com/kylelemons/gousb/usb"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/nodtem66/usbint1/config"
 )
 
 type Tag struct {
@@ -60,16 +62,33 @@ func NewAPIRouter(h *APIHandler) *httprouter.Router {
 //------------------------------------------------------------------------------
 
 // APIHandler is a routine routed with api path
+// conf store config from toml file
+// version and commit is used for development version
+// servicerecord is record about pid for each service
+//   servicerecord[0] is pid of service 1
+//   servicerecord[N] is pid of service N-1
+// busrecord
+type ServiceInfo struct {
+	Pid     string
+	Bus     int
+	Address int
+}
 type APIHandler struct {
-	Conf    *config.TomlConfig
-	Version string
-	Commit  string
-	CacheDB map[string]*sql.DB
+	Conf          *config.TomlConfig
+	Version       string
+	Commit        string
+	ServiceRecord []ServiceInfo
+	StartedPid    map[string]bool
 }
 
 // New APIHandler with version -1 and commit nil
 func New() *APIHandler {
-	h := &APIHandler{Version: "-1", Commit: ""}
+	h := &APIHandler{
+		Version:       "-1",
+		Commit:        "",
+		ServiceRecord: make([]ServiceInfo, 10),
+		StartedPid:    map[string]bool{},
+	}
 	return h
 }
 
@@ -383,12 +402,18 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 			return
 		}
 		// prepare where statement
-		whereStmt := ""
+		whereCause := make([]string, 0)
 		if mql.After > 0 {
-			whereStmt += fmt.Sprintf(` AND time > %d`, mql.After)
+			whereCause = append(whereCause, fmt.Sprintf(`time > %d`, mql.After))
 		}
 		if mql.Before > 0 {
-			whereStmt += fmt.Sprintf(` AND time < %d`, mql.Before)
+			whereCause = append(whereCause, fmt.Sprintf(`time < %d`, mql.Before))
+		}
+		var whereStmt string
+		if len(whereCause) > 0 {
+			whereStmt = fmt.Sprintf(`WHERE %s`, strings.Join(whereCause, "AND"))
+		} else {
+			whereStmt = ""
 		}
 		// prepare order by statement
 		orderStmt := "DESC"
@@ -396,8 +421,8 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 			orderStmt = "ASC"
 		}
 		// prepare total statement
-		stmt := fmt.Sprintf(`SELECT %s FROM %s ORDER BY time %s LIMIT %d`,
-			strings.Join(mql.Channel, ","), mntId, orderStmt, mql.Limit,
+		stmt := fmt.Sprintf(`SELECT %s FROM %s %s ORDER BY time %s LIMIT %d`,
+			strings.Join(mql.Channel, ","), mntId, whereStmt, orderStmt, mql.Limit,
 		)
 		// query to rows
 		rows, err := conn.Query(stmt)
@@ -471,11 +496,187 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 		}
 		ret["result"] = status
 	case "list_usb":
-		if jsonStr, err := ListUsbDevice(); err != nil {
+		if mapDev, err := ListUsbDevice(); err != nil {
 			err0 = err
 			return
 		} else {
-			ret["result"] = jsonStr
+			ret["result"] = mapDev
+		}
+	case "list_service":
+		status := make([]map[string]string, 0)
+		for _, rec := range h.ServiceRecord {
+			s := map[string]string{
+				"pid":     rec.Pid,
+				"bus":     fmt.Sprintf("%d", rec.Bus),
+				"address": fmt.Sprintf("%d", rec.Address),
+			}
+			status = append(status, s)
+		}
+		ret["result"] = status
+	case "print_log":
+		// query log file from usbapi path
+		var logFile *os.File
+		if logFile, err0 = os.Open(h.Conf.Log.FileName); err0 != nil {
+			return
+		}
+		defer logFile.Close()
+
+		buffer := make([]byte, 1000)
+		var seekMove int64
+		var readCount int
+		if seekMove, err0 = logFile.Seek(0, 2); err0 != nil {
+			return
+		}
+		if seekMove-1000 > 0 {
+			if _, err0 = logFile.Seek(-1000, 2); err0 != nil {
+				return
+			}
+
+		} else {
+			if _, err0 = logFile.Seek(0, 0); err0 != nil {
+				return
+			}
+
+		}
+		if readCount, err0 = logFile.Read(buffer); err0 != nil {
+			return
+		}
+
+		ret[h.Conf.Log.FileName] = string(buffer[0:readCount])
+
+		// query log file from database path
+
+		files, _ := filepath.Glob(filepath.Join(h.Conf.DB.Path, "*.log"))
+		for _, file := range files {
+			var logF *os.File
+			if logF, err0 = os.Open(file); err0 != nil {
+				return
+			}
+			defer logF.Close()
+			buffer := make([]byte, 1000)
+			var seekMove int64
+			var readCount int
+			if seekMove, err0 = logF.Seek(0, 2); err0 != nil {
+				return
+			}
+			if seekMove-1000 > 0 {
+				if _, err0 = logF.Seek(-1000, 2); err0 != nil {
+					return
+				}
+
+			} else {
+				if _, err0 = logF.Seek(0, 0); err0 != nil {
+					return
+				}
+
+			}
+			if readCount, err0 = logF.Read(buffer); err0 != nil {
+				return
+			}
+			ret[file] = string(buffer[0:readCount])
+		}
+	case "start":
+		// query string ?bus=...&addr=...&patient=...
+		query := r.URL.Query()
+		patient := query.Get("patient")
+		busStr := query.Get("bus")
+		addrStr := query.Get("addr")
+		isStart := false
+		if len(patient) == 0 || len(busStr) == 0 || len(addrStr) == 0 {
+			err0 = fmt.Errorf("missing query")
+			return
+		}
+		var bufInt64 int64
+		if bufInt64, err0 = strconv.ParseInt(busStr, 10, 0); err0 != nil {
+			return
+		}
+		bus := int(bufInt64)
+		if bufInt64, err0 = strconv.ParseInt(addrStr, 10, 0); err0 != nil {
+			return
+		}
+		addr := int(bufInt64)
+		if len(patient) > 0 && bus != 0 && addr != 0 {
+			for i, s := range h.ServiceRecord {
+				if len(s.Pid) == 0 || s.Bus == 0 || s.Address == 0 {
+
+					go func() {
+						//start usb service i+1
+						var err error
+						if err = StartUsbIntService(i+1, patient, bus, addr); err != nil {
+							log.Print(err)
+							return
+						}
+						// get pids list from all usbint1.exe process
+						var pids []string
+						if pids, err = ListPidFromName("usbint1"); err != nil {
+							log.Print(err)
+							return
+						}
+						for _, pid := range pids {
+							// check if not exists pid
+							if val := h.StartedPid[pid]; val == false {
+								h.ServiceRecord[i].Pid = pid
+								h.ServiceRecord[i].Bus = bus
+								h.ServiceRecord[i].Address = addr
+								h.StartedPid[pid] = true
+							}
+						}
+					}()
+					isStart = true
+					ret["result"] = i
+					break
+				}
+			}
+			if isStart == false {
+				err0 = fmt.Errorf("cannot start; no idle USB service")
+			}
+		} else {
+			err0 = fmt.Errorf("invalid query string")
+		}
+	case "stop":
+		// query string ?bus=...&addr=...&patient=...
+		query := r.URL.Query()
+		patient := query.Get("patient")
+		busStr := query.Get("bus")
+		addrStr := query.Get("addr")
+		isStop := false
+		if len(patient) == 0 || len(busStr) == 0 || len(addrStr) == 0 {
+			err0 = fmt.Errorf("missing query")
+			return
+		}
+		var bufInt64 int64
+		if bufInt64, err0 = strconv.ParseInt(busStr, 10, 0); err0 != nil {
+			return
+		}
+		bus := int(bufInt64)
+		if bufInt64, err0 = strconv.ParseInt(addrStr, 10, 0); err0 != nil {
+			return
+		}
+		addr := int(bufInt64)
+		if len(patient) > 0 && bus != 0 && addr != 0 {
+			for i, s := range h.ServiceRecord {
+				// if exitsts pid in record; clear it
+				if s.Bus == bus && s.Address == addr {
+					go func() {
+						if err := StopUsbIntService(i + 1); err != nil {
+							log.Print(err)
+							return
+						}
+						h.ServiceRecord[i].Pid = ""
+						h.ServiceRecord[i].Bus = 0
+						h.ServiceRecord[i].Address = 0
+						h.StartedPid[s.Pid] = false
+					}()
+					ret["result"] = i
+					isStop = true
+					break
+				}
+			}
+			if isStop == false {
+				err0 = fmt.Errorf("cannot stop; no specific USB service")
+			}
+		} else {
+			err0 = fmt.Errorf("invalid query string")
 		}
 	default:
 		err0 = fmt.Errorf("path %s not found", option)
@@ -637,11 +838,11 @@ func GetIP() ([]string, error) {
 	}
 }
 
-func ListUsbDevice() (jsonStr string, err error) {
+func ListUsbDevice() (devMap []map[string]string, err error) {
 	context := usb.NewContext()
 	defer context.Close()
 	var devices []*usb.Device
-	var jsonByte []byte
+
 	devices, err = context.ListDevices(func(desc *usb.Descriptor) bool {
 		if desc.Vendor == usb.ID(0x10c4) && desc.Product == usb.ID(0x8a40) {
 			return true
@@ -654,7 +855,6 @@ func ListUsbDevice() (jsonStr string, err error) {
 	if len(devices) == 0 {
 		err = errors.New("no devices")
 	}
-	devMap := make([]map[string]string, 0)
 	for _, dev := range devices {
 		defer dev.Close()
 
@@ -669,9 +869,6 @@ func ListUsbDevice() (jsonStr string, err error) {
 		mymap["pid"] = fmt.Sprintf("%X", int(dev.Product))
 		mymap["bus_address"] = fmt.Sprintf("%d:%d", dev.Bus, dev.Address)
 		devMap = append(devMap, mymap)
-	}
-	if jsonByte, err = json.Marshal(devMap); err == nil {
-		jsonStr = string(jsonByte)
 	}
 	return
 }

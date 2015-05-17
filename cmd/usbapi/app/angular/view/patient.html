@@ -1,0 +1,40 @@
+<!-- Top panel for select data channel -->
+<div class="row">
+	<div class="col-xs-5">
+		<h2><i class="mdi-action-account-circle"></i> Patient ID <span style="color:#04efee">{{patient_id}}</span></h2>
+	</div>
+	<div class="col-xs-7">
+		<div class="row">
+		<fieldset>
+		<div class="form-group">
+			<label for="inputPatientId" class="control-label col-xs-5" style="color:#ddd">Measurement unit</label>	
+			<label for="inputPatientId" class="control-label col-xs-5" style="color:#ddd">Channel</label>	
+			<div class="col-xs-5">
+				<select class="form-control" data-dropdownjs="true"
+					ng-model="select_mnt" ng-options="mnt as mnt for mnt in mnts" ng-change="changeMeasurement()">
+					<option value=''>-- select type of measurement --</option>
+				</select>
+			</div>
+			<div class="col-xs-5">
+				<select class="form-control" data-dropdownjs="true"
+					ng-model="select_channel" ng-options="ch.column as ch.name for ch in mnt_desc" ng-change="changeChannel()">
+					<option value=''>-- select channel --</option>
+				</select>
+			</div>
+			<div class="col-xs-2" style="top:-15px;">
+			<button class="btn btn-info btn-fab" ng-click="refreshGraph();"><i class="mdi-navigation-refresh" style="top:-2px;left:1px"></i></button>
+		</div>
+		</div>
+		</fieldset>
+		
+		</div>
+	</div>
+</div>
+
+<!-- graph render section -->
+<div class="row" style="background: #000;">
+	<div class="col-xs-12" auto-height id="myCanvas"></div>
+</div>
+
+<script>$.material.init();</script>
+

@@ -16,12 +16,64 @@
 <div ng-show="config_page=='log'">
 <div class="row"><div class="col-xs-12"><h1>System Log</h1></div></div>
 <div class="row">
-	<div class="col-xs-12" ng-hide="log_content.length > 0">
+	<div class="col-xs-12" ng-hide="log_content">
 		<pre>NO LOG</pre>
 	</div>
-	<div class="col-xs-12" ng-show="log_content.length > 0">
-		<pre>{{ log_content }}</pre>
+	<div class="col-xs-12" ng-show="log_content">
+		<div class="row" ng-repeat="(name,log) in log_content">
+			<div class="col-xs-12">
+				<h5>{{name}}</h5>
+				<pre>{{ log }}</pre>
+			</div>
+		</div>
 	</div>
+</div>
+</div>
+
+<!-- service config page -->
+<div ng-show="config_page=='service'">
+<div class="row"><div class="col-xs-12"><h1>Backend Service</h1></div></div>
+
+<div class="row">
+	<div class="col-xs-4">
+		<div class="panel panel-default">
+			<div class="panel-heading"><b>IP Address</b></div>
+			<div class="panel-group">
+				<ul class="list-group">
+					<li class="list-group-item" ng-repeat="ip in ipaddr">{{ip}}</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+	<div class="col-xs-4">
+		<div class="panel panel-default">
+			<div class="panel-heading"><b>Device status</b></div>
+			<div class="panel-group">
+				<ul class="list-group">
+					<li class="list-group-item" ng-repeat="usb in usb_services">
+						USB{{$index+1}}
+						<span class="label-desc" ng-show="usb['pid']">[bus:{{usb["bus"]}}] [address:{{usb["address"]}}] [id:{{usb["pid"]}}]</span>
+						<span class="label badge label-success" ng-show="usb['pid']">running</span>
+						<span class="label badge label-default" ng-hide="usb['pid']">idle</span>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>	
+	<div class="col-xs-4">
+		<div class="panel panel-default">
+			<div class="panel-heading"><b>Service Status</b></div>
+			<div class="panel-group">
+				<ul class="list-group">
+					<li class="list-group-item" ng-repeat="(proc,run) in process_status">
+						{{proc}}
+						<span class="label label-success badge" ng-show="run">running</span>
+						<span class="label label-default badge" ng-hide="run">stop</span>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>	
 </div>
 </div>
 
@@ -82,7 +134,7 @@
 	<div class="row">
 		<div class="col-xs-3">
 			<button class="btn btn-default" style="background-color: #DDD;">Cancel</button>
-			<button type="submmit" class="btn btn-primary">Save</button>
+			<button type="submmit" class="btn btn-primary" ng-click="c.saveSetting()">Save</button>
 		</div>
 	</div>
 </div>
