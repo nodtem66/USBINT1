@@ -257,3 +257,46 @@ func TestMariaDB_StartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+func TestMariaDB_Shade(t *testing.T) {
+	var err error
+
+	// init sqlite connection
+	sqlite := NewSqliteHandle()
+	sqlite.PatientId = "TEST"
+	if err = sqlite.ConnectNew(); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(sqlite.PatientId + ".db")
+	defer sqlite.Close()
+
+	// init mysql connection
+	maria := NewMariaDBHandle(DSN)
+	maria.ScanRate = time.Second
+	maria.Mode = "shade"
+	maria.Start()
+
+	if err := sqlite.EnableMeasurement([]string{"test", "test_2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	sqlite.IdFirmware = 1
+	sqlite.NumTask = 1
+	sqlite.Start()
+	var count int64
+	go func() {
+		for i := 0; ; i++ {
+			sqlite.Pipe <- []int64{int64(i), 0, 1}
+			count++
+		}
+	}()
+	time.Sleep(10 * time.Millisecond)
+	sqlite.Stop()
+	time.Sleep(time.Second)
+	maria.Stop()
+
+	var count2 int64
+	if err = sqlite.Connection.QueryRow(`SELECT count(*) FROM general_1 WHERE sync=0;`).Scan(&count2); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("[total read: %d left: %d]", count, count2)
+}

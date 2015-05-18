@@ -29,3 +29,9 @@ interval = "10s"
 # mysql_dsn = "/db_name"
 # mysql_dsn = "root:root@tcp(192.168.59.103:3306)/department1"
 mysql_dsn = "/db_name"
+# mode = "shade" for shading data without archive to external server
+# mode = "sync" for shading data with archive to external server
+mode = "shade"
+
+# the data that older than `shade_time` become sync state
+shade_time = "10s"

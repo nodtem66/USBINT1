@@ -1,15 +1,22 @@
 @echo off
 SET /P DIR=<env.txt
-nssm.exe install usbint1 %DIR%\usbint1.exe
-nssm.exe set usbint1 AppParameters T001
-nssm.exe set usbint1 AppStdout %DIR%\usbint1.log
-nssm.exe set usbint1 AppStderr %DIR%\usbint1.log
-nssm.exe set usbint1 Start SERVICE_DEMAND_START
-nssm.exe set usbint1 AppStdoutCreationDisposition 4
-nssm.exe set usbint1 AppStderrCreationDisposition 4
-nssm.exe set usbint1 AppRotateFiles 1
-nssm.exe set usbint1 AppRotateOnline 0
-nssm.exe set usbint1 AppRotateSeconds 86400
-nssm.exe set usbint1 AppRotateBytes 1048576
+FOR /L %%i IN (1,1,10) DO (
+nssm.exe install usbint1_%%i %DIR%\data\usbint1.exe
+nssm.exe set usbint1_%%i AppParameters T001
+nssm.exe set usbint1_%%i AppStdout %DIR%\data\usbint1.log
+nssm.exe set usbint1_%%i AppStderr %DIR%\data\usbint1.log
+nssm.exe set usbint1_%%i Start SERVICE_DEMAND_START
+nssm.exe set usbint1_%%i AppStdoutCreationDisposition 4
+nssm.exe set usbint1_%%i AppStderrCreationDisposition 4
+nssm.exe set usbint1_%%i AppRotateFiles 1
+nssm.exe set usbint1_%%i AppRotateOnline 0
+nssm.exe set usbint1_%%i AppRotateSeconds 86400
+nssm.exe set usbint1_%%i AppRotateBytes 1048576
 echo.
+)
+nssm.exe install usbshad %DIR%\usbshad.exe
+nssm.exe set usbshade Start SERVICE_DEMAND_START
+
+nssm.exe install usbsync %DIR%\usbsync.exe
+nssm.exe set usbsync Start SERVICE_DEMAND_START
 pause

@@ -76,6 +76,14 @@ legend {color:#000;}
 	margin-bottom: 16px;
 }
 .list-group .list-group-item .list-group-item-heading {color: #00A8ff;}
+#patient-float-info {
+	background:#02335c;
+	padding: 24px;
+	font-size: 3em;
+	display: absolute;
+	left: 20px;
+	border-radius: 10px;
+}
 
 /* Setting page */
 #setting-page input.form-control {

@@ -1,2 +1,2 @@
 @echo off
-nssm.exe edit usbint1
+nssm.exe edit usbshade

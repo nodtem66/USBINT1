@@ -6,7 +6,7 @@ organization = "Developer"
 description = "A Virtual Device for development"
 
 [database]
-path = "D:\\work\\usbint"
+path = "D:\\work\\usbint\\data"
 
 [server]
 address = ":8080"
@@ -16,3 +16,7 @@ file = "./usbapi.log"
 
 [shading]
 interval = "10s"
+
+[sync]
+mode = "shade"
+shade_time = "30s"

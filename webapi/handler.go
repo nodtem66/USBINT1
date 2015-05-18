@@ -74,22 +74,40 @@ type ServiceInfo struct {
 	Address int
 }
 type APIHandler struct {
-	Conf          *config.TomlConfig
-	Version       string
-	Commit        string
-	ServiceRecord []ServiceInfo
-	StartedPid    map[string]bool
+	Conf              *config.TomlConfig
+	Version           string
+	Commit            string
+	ServiceRecord     []ServiceInfo
+	StartedPid        map[string]bool
+	StartedBusAddress map[string]bool
+	SqliteConn        map[string]*sql.DB
 }
 
 // New APIHandler with version -1 and commit nil
 func New() *APIHandler {
 	h := &APIHandler{
-		Version:       "-1",
-		Commit:        "",
-		ServiceRecord: make([]ServiceInfo, 10),
-		StartedPid:    map[string]bool{},
+		Version:           "-1",
+		Commit:            "",
+		ServiceRecord:     make([]ServiceInfo, 10),
+		StartedPid:        map[string]bool{},
+		StartedBusAddress: map[string]bool{},
+		SqliteConn:        map[string]*sql.DB{},
 	}
 	return h
+}
+
+// singleton for cache SqliteConn
+// use path filename for hashmap
+func (h *APIHandler) GetSqliteConnection(path string) (conn *sql.DB, err error) {
+	var ok bool
+	if conn, ok = h.SqliteConn[path]; ok {
+		return
+	}
+	if conn, err = sql.Open("sqlite3", path); err != nil {
+		return
+	}
+	h.SqliteConn[path] = conn
+	return
 }
 
 // Index page print program name and version
@@ -157,14 +175,11 @@ func (h *APIHandler) GetTags(w http.ResponseWriter, r *http.Request, ps httprout
 		err0 = fmt.Errorf("no patient")
 		return
 	}
-
-	// open db connection
-	conn, err := sql.Open("sqlite3", dbFileName)
-	if err != nil {
-		err0 = err
+	var conn *sql.DB
+	var err error
+	if conn, err0 = h.GetSqliteConnection(dbFileName); err0 != nil {
 		return
 	}
-	defer conn.Close()
 
 	// no query string
 	var rows *sql.Rows
@@ -231,14 +246,11 @@ func (h *APIHandler) GetTag(w http.ResponseWriter, r *http.Request, ps httproute
 		err0 = fmt.Errorf("no patient")
 		return
 	}
-
-	// open db connection
-	conn, err := sql.Open("sqlite3", dbFileName)
-	if err != nil {
-		err0 = err
+	var conn *sql.DB
+	var err error
+	if conn, err0 = h.GetSqliteConnection(dbFileName); err0 != nil {
 		return
 	}
-	defer conn.Close()
 
 	result := Tag{}
 	if err = conn.QueryRow(
@@ -276,14 +288,11 @@ func (h *APIHandler) GetMeasurements(w http.ResponseWriter, r *http.Request, ps 
 		err0 = fmt.Errorf("no patient")
 		return
 	}
-
-	// open db connection
-	conn, err := sql.Open("sqlite3", dbFileName)
-	if err != nil {
-		err0 = err
+	var conn *sql.DB
+	var err error
+	if conn, err0 = h.GetSqliteConnection(dbFileName); err0 != nil {
 		return
 	}
-	defer conn.Close()
 
 	// query table_name
 	var rows *sql.Rows
@@ -352,26 +361,32 @@ func (h *APIHandler) GetMeasurement(w http.ResponseWriter, r *http.Request, ps h
 		err0 = fmt.Errorf("no patient")
 		return
 	}
-
-	// open db connection
-	conn, err := sql.Open("sqlite3", dbFileName)
-	if err != nil {
-		err0 = err
+	var conn *sql.DB
+	if conn, err0 = h.GetSqliteConnection(dbFileName); err0 != nil {
 		return
 	}
-	defer conn.Close()
 
 	// no query string
 	if len(query) == 0 {
 		// struct for measurement description
 		desc := MeasurementDescriptor{Name: mntId}
 
-		// query total record and last time
+		// query total record
 		if err := conn.QueryRow(
-			fmt.Sprintf(`SELECT count(_rowid_) as total, time  FROM %s ORDER BY time DESC LIMIT 1;`, mntId),
-		).Scan(&desc.TotalRecord, &desc.LastTime); err != nil {
+			fmt.Sprintf(`SELECT count(_rowid_) as total FROM %s ORDER BY time DESC LIMIT 1;`, mntId),
+		).Scan(&desc.TotalRecord); err != nil {
 			err0 = err
 			return
+		}
+
+		// query last time
+		if desc.TotalRecord > 0 {
+			if err := conn.QueryRow(
+				fmt.Sprintf(`SELECT time FROM %s ORDER BY time DESC LIMIT 1;`, mntId),
+			).Scan(&desc.LastTime); err != nil {
+				err0 = err
+				return
+			}
 		}
 
 		// query channel_name
@@ -500,31 +515,48 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 			err0 = err
 			return
 		} else {
-			ret["result"] = mapDev
+			retDev := []map[string]string{}
+			for _, mdev := range mapDev {
+				bus := mdev["bus_address"]
+				if len(bus) > 0 && !h.StartedBusAddress[bus] {
+					retDev = append(retDev, mdev)
+				}
+			}
+			ret["result"] = retDev
 		}
 	case "list_service":
-		status := make([]map[string]string, 0)
+		status := []map[string]string{}
 		var pids []string
 		mapPid := map[string]bool{}
+
+		// get current pids
 		pids, err0 = ListPidFromName("usbint1")
 		for _, pid := range pids {
 			mapPid[pid] = true
 		}
+		// update each pid record; remove old
 		for i, rec := range h.ServiceRecord {
 			var s map[string]string
-			if mapPid[rec.Pid] {
-				s = map[string]string{
-					"pid":     rec.Pid,
-					"bus":     fmt.Sprintf("%d", rec.Bus),
-					"address": fmt.Sprintf("%d", rec.Address),
+
+			// if record has pid
+			if len(rec.Pid) > 0 {
+				// if current process pid is not exists
+				// stop service and remove from record
+				if mapPid[rec.Pid] == false {
+
+					StopUsbIntService(i + 1)
+					StopUsbIntService(i + 1)
+					h.StartedPid[rec.Pid] = false
+					h.StartedBusAddress[fmt.Sprintf("%d:%d", rec.Bus, rec.Address)] = false
+					h.ServiceRecord[i].Pid = ""
+					h.ServiceRecord[i].Bus = 0
+					h.ServiceRecord[i].Address = 0
 				}
-			} else {
-				StopUsbIntService(i + 1)
-				StopUsbIntService(i + 1)
-				h.ServiceRecord[i].Pid = ""
-				h.ServiceRecord[i].Bus = 0
-				h.ServiceRecord[i].Address = 0
-				s = map[string]string{}
+			}
+			s = map[string]string{
+				"pid":     rec.Pid,
+				"bus":     fmt.Sprintf("%d", rec.Bus),
+				"address": fmt.Sprintf("%d", rec.Address),
 			}
 			status = append(status, s)
 		}
@@ -618,6 +650,9 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 					go func() {
 						//start usb service i+1
 						var err error
+						if err = StopUsbIntService(i+1); err != nil {
+							log.Print(err)
+						}
 						if err = StartUsbIntService(i+1, patient, bus, addr); err != nil {
 							log.Print(err)
 							return
@@ -635,6 +670,7 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 								h.ServiceRecord[i].Bus = bus
 								h.ServiceRecord[i].Address = addr
 								h.StartedPid[pid] = true
+								h.StartedBusAddress[fmt.Sprintf("%d:%d", bus, addr)] = true
 							}
 						}
 					}()
@@ -681,10 +717,12 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 							log.Print(err)
 							return
 						}
+						h.StartedPid[s.Pid] = false
+						h.StartedBusAddress[fmt.Sprintf("%d:%d", bus, addr)] = false
 						h.ServiceRecord[i].Pid = ""
 						h.ServiceRecord[i].Bus = 0
 						h.ServiceRecord[i].Address = 0
-						h.StartedPid[s.Pid] = false
+
 					}()
 					ret["result"] = i
 					isStop = true
@@ -703,7 +741,9 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 }
 
 func (h *APIHandler) Close() {
-
+	for _, conn := range h.SqliteConn {
+		conn.Close()
+	}
 }
 
 //------------------------------------------------------------------------------

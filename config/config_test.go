@@ -23,4 +23,7 @@ func TestDecodeToml(t *testing.T) {
 	if conf.Sync.Interval.Duration != time.Second*10 {
 		t.Fatal("Expect %s %s", conf.Shade.Interval, time.Second*10)
 	}
+	if conf.Sync.ShadeTime.Duration != time.Second*10 {
+		t.Fatal("Expect %s %s", conf.Shade.Interval, time.Second*10)
+	}
 }

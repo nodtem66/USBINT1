@@ -32,8 +32,10 @@ type Shading struct {
 	MinimumSync int      `toml:"sync"`
 }
 type SyncInfo struct {
-	Interval duration `toml:"interval"`
-	DSN      string   `toml:"mysql_dsn"`
+	Interval  duration `toml:"interval"`
+	DSN       string   `toml:"mysql_dsn"`
+	Mode      string   `toml:"mode"`
+	ShadeTime duration `toml:"shade_time"`
 }
 type duration struct {
 	time.Duration

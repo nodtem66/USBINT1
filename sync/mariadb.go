@@ -4,14 +4,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
-	. "github.com/nodtem66/usbint1/db"
 	"log"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
+	. "github.com/nodtem66/usbint1/db"
 )
 
 type MariaDBHandle struct {
@@ -21,16 +22,20 @@ type MariaDBHandle struct {
 	Root       string
 	Quit       chan struct{}
 	done       chan struct{}
+	Mode       string
+	ShadeTime  time.Duration
 }
 
 // new mysql handle from DSN and patient id
 func NewMariaDBHandle(dsn string) *MariaDBHandle {
 	maria := &MariaDBHandle{
-		DSN:      dsn,
-		Quit:     make(chan struct{}),
-		done:     make(chan struct{}),
-		ScanRate: time.Second,
-		Root:     "./",
+		DSN:       dsn,
+		Quit:      make(chan struct{}),
+		done:      make(chan struct{}),
+		ScanRate:  time.Second,
+		Root:      "./",
+		Mode:      "sync",
+		ShadeTime: time.Second * 10,
 	}
 	return maria
 }
@@ -126,7 +131,11 @@ func (m *MariaDBHandle) Start() {
 					patientId := filepath.Base(file)
 					patientId = patientId[0 : len(patientId)-3]
 					log.Printf("[Checking database %s]", patientId)
-					m.runSync(patientId, file)
+					if m.Mode == "sync" {
+						m.runSync(patientId, file)
+					} else if m.Mode == "shade" {
+						m.runShade(patientId, file)
+					}
 				}
 
 			case <-m.done:
@@ -144,7 +153,9 @@ func (m *MariaDBHandle) Stop() {
 }
 
 func (m *MariaDBHandle) Close() {
-	m.Connection.Close()
+	if m.Connection != nil {
+		m.Connection.Close()
+	}
 }
 
 func (m *MariaDBHandle) runSync(patientId string, path string) {
@@ -246,6 +257,70 @@ func (m *MariaDBHandle) runSync(patientId string, path string) {
 			}
 			// update record increase sync
 			if _, err = sqlite.Exec(fmt.Sprintf(`UPDATE %s_%d SET sync=1 WHERE sync=0;`, tag.Measurement, tag.IdTag)); err != nil {
+				log.Fatal(err)
+			}
+		}()
+	}
+	wait.Wait()
+}
+
+func (m *MariaDBHandle) runShade(patientId string, path string) {
+	// open option for sqlite db
+	dsn := fmt.Sprintf("file:%s?mode=rw&_busy_timeout=5000", path)
+	// open sqlite connection
+	var err error
+	var sqlite *sql.DB
+	var rows *sql.Rows
+	if sqlite, err = sql.Open("sqlite3", dsn); err != nil {
+		log.Fatal(err)
+	}
+	defer sqlite.Close()
+	// query for measurement unit with patient id
+	if rows, err = sqlite.Query(`SELECT id,mnt,unit,resolution,ref_min,ref_max,sampling_rate,descriptor,num_channel FROM tag;`); err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	// store measurements from tag table into DataTag
+	tags := make([]DataTag, 0)
+	for rows.Next() {
+		tag := DataTag{}
+		var sampling int64
+		var desc []byte
+		if err = rows.Scan(&tag.IdTag, &tag.Measurement, &tag.Unit, &tag.Resolution, &tag.ReferenceMin, &tag.ReferenceMax, &sampling, &desc, &tag.NumChannel); err != nil {
+			log.Fatal(err)
+		}
+		tag.PatientId = patientId
+		tag.SamplingRate = time.Duration(sampling)
+		json.Unmarshal(desc, &tag.Descriptor)
+		tags = append(tags, tag)
+	}
+	if err = rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	// start worker for each measurement
+	var wait sync.WaitGroup
+	for i := 0; i < len(tags); i++ {
+		tag := tags[i]
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+
+			var err error
+			var sqlite *sql.DB
+			// start worker
+			log.Printf("start worker for %s_%d\n", tag.Measurement, tag.IdTag)
+
+			// create sqlite connection
+			if sqlite, err = sql.Open("sqlite3", dsn); err != nil {
+				log.Fatal(err)
+			}
+			defer sqlite.Close()
+
+			whereStmt := fmt.Sprintf("AND time <= %d", time.Now().Add(-1*m.ShadeTime).UnixNano())
+			// update record increase sync
+			if _, err = sqlite.Exec(fmt.Sprintf(`UPDATE %s_%d SET sync=1 WHERE sync=0 %s;`, tag.Measurement, tag.IdTag, whereStmt)); err != nil {
 				log.Fatal(err)
 			}
 		}()

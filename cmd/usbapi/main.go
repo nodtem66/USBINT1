@@ -19,12 +19,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/BurntSushi/toml"
-	. "github.com/nodtem66/usbint1/config"
-	. "github.com/nodtem66/usbint1/webapi"
 	"log"
 	"net/http"
 	"os"
+	"runtime"
+
+	"github.com/BurntSushi/toml"
+	. "github.com/nodtem66/usbint1/config"
+	. "github.com/nodtem66/usbint1/webapi"
 )
 
 // Define Build LDFLAGS variable
@@ -35,6 +37,7 @@ var Commit string
 var conf TomlConfig
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	// new handle
 	handle := New()
 	if len(Version) > 0 {

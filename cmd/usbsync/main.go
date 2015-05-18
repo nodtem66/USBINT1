@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/BurntSushi/toml"
-	. "github.com/nodtem66/usbint1/config"
-	. "github.com/nodtem66/usbint1/sync"
 	"log"
 	"os"
 	"os/signal"
+
+	"github.com/BurntSushi/toml"
+	. "github.com/nodtem66/usbint1/config"
+	. "github.com/nodtem66/usbint1/sync"
 )
 
 // Define Build LDFLAGS variable
@@ -19,6 +20,7 @@ func main() {
 	conf := TomlConfig{
 		DB:    Database{Path: "./"},
 		Shade: Shading{MinimumSync: 1},
+		Sync:  SyncInfo{Mode: "shade"},
 	}
 	if len(os.Args) > 1 {
 		if _, err := toml.DecodeFile(os.Args[1], &conf); err != nil {
@@ -50,11 +52,16 @@ func main() {
 	//shade.MinimumSync = conf.Shade.MinimumSync
 	var err error
 	maria := NewMariaDBHandle(conf.Sync.DSN)
-	if err = maria.Connect(); err != nil {
-		log.Fatal(err)
+	if conf.Sync.Mode == "shade" {
+	} else if conf.Sync.Mode == "sync" {
+		if err = maria.Connect(); err != nil {
+			log.Fatal(err)
+		}
+		defer maria.Close()
 	}
-	defer maria.Close()
+	maria.Mode = conf.Sync.Mode
 	maria.ScanRate = conf.Sync.Interval.Duration
+	maria.ShadeTime = conf.Sync.ShadeTime.Duration
 	maria.Root = conf.DB.Path
 
 	// hook os signal for exit program
@@ -71,8 +78,8 @@ func main() {
 		}
 	}()
 	log.SetPrefix("[USB_SYNC] ")
-	log.Printf("[Start sync every %s] [database scaning path %s]\n",
-		conf.Sync.Interval.Duration, conf.DB.Path)
+	log.Printf("[Start sync every %s/%s] [database scaning path %s]\n",
+		maria.ScanRate, maria.ShadeTime, conf.DB.Path)
 	maria.Start()
 
 	//wait for exit signal
