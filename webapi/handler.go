@@ -504,11 +504,27 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 		}
 	case "list_service":
 		status := make([]map[string]string, 0)
-		for _, rec := range h.ServiceRecord {
-			s := map[string]string{
-				"pid":     rec.Pid,
-				"bus":     fmt.Sprintf("%d", rec.Bus),
-				"address": fmt.Sprintf("%d", rec.Address),
+		var pids []string
+		mapPid := map[string]bool{}
+		pids, err0 = ListPidFromName("usbint1")
+		for _, pid := range pids {
+			mapPid[pid] = true
+		}
+		for i, rec := range h.ServiceRecord {
+			var s map[string]string
+			if mapPid[rec.Pid] {
+				s = map[string]string{
+					"pid":     rec.Pid,
+					"bus":     fmt.Sprintf("%d", rec.Bus),
+					"address": fmt.Sprintf("%d", rec.Address),
+				}
+			} else {
+				StopUsbIntService(i + 1)
+				StopUsbIntService(i + 1)
+				h.ServiceRecord[i].Pid = ""
+				h.ServiceRecord[i].Bus = 0
+				h.ServiceRecord[i].Address = 0
+				s = map[string]string{}
 			}
 			status = append(status, s)
 		}
@@ -658,6 +674,9 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 				// if exitsts pid in record; clear it
 				if s.Bus == bus && s.Address == addr {
 					go func() {
+						if err := StopUsbIntService(i + 1); err != nil {
+							log.Print(err)
+						}
 						if err := StopUsbIntService(i + 1); err != nil {
 							log.Print(err)
 							return
