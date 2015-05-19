@@ -13,6 +13,7 @@
   <link href="css/material-fullpalette.min.css" rel="stylesheet">
   <link href="css/ripples.min.css" rel="stylesheet">  
   <link href="css/snackbar.min.css" rel="stylesheet">
+  <link href="css/angular-gridster.min.css" rel="stylesheet">
   <!--<link href="css/font-awesome.min.css" media="screen" rel="stylesheet" />-->
   <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
   <!--[if lt IE 9]>
@@ -45,8 +46,8 @@
     <!-- Left navbar -->
     <ul class="nav navbar-nav">
       <li ng-class="{active: isActive('/')}"><a href="#/"><i class="mdi-action-dashboard"></i> Dashboard</a></li>
-      <li ng-class="{active: isActive('/custom_view')}" style="width:150px"><a href="#/custom_view"><i class="mdi-action-dashboard"></i> Custom View</a></li>
-      <li ng-class="{active: isActive('/history')}"><a href="#/history"><i class="mdi-action-history"></i> History</a></li>
+      <li ng-class="{active: isActive('/custom_view')}" style="width:140px"><a href="#/custom_view"><i class="mdi-action-extension"></i> Custom View</a></li>
+      <!--<li ng-class="{active: isActive('/history')}"><a href="#/history"><i class="mdi-action-history"></i> History</a></li>-->
       <li class="dropdown" ng-class="{active: isActive('/control_panel')}" style="display:inline-block;width:150px">
         <a href="#/control_panel" class="dropdown-toggle" data-toggle="dropdown" data-target="#"  ng-click="app.gotoConfigPage('');"> <span>Control Panel</span> <b class="caret"></b></a>
         <ul class="dropdown-menu">
@@ -81,13 +82,16 @@
 <script src="js/angular-animate.min.js"></script>
 <script src="js/angular-aria.min.js"></script>
 <script src="js/angular-route.min.js"></script>
+<script src="js/angular-gridster.min.js"></script>
 <script src="js/jquery.nouislider.all.min.js"></script>
+<script src="js/jquery.resize.js"></script>
+<script src="js/ui-bootstrap-tpls-0.13.0.min.js"></script>
 <script src="js/snackbar.min.js"></script>
 <script src="js/moment.min.js"></script>
-<script src="js/angular-moment.min.js"></script>
 <script src="js/ripples.min.js"></script>
 <script src="js/material.min.js"></script>
 <script src="angular/main.js"></script>
-<script src="angular/directive/directives.js"></script>
+<script src="angular/controller/patient.js"></script>
+<script src="angular/controller/widget.js"></script>
 </body>
 </html>

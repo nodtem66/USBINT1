@@ -84,6 +84,7 @@ legend {color:#000;}
 	left: 20px;
 	border-radius: 10px;
 }
+.canvasjs-chart-toolbar {color: #00A8FF;}
 
 /* Setting page */
 #setting-page input.form-control {

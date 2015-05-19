@@ -1,0 +1,53 @@
+<div clas="modal">
+    <form name="_form" class="form-horizontal" ng-submit="submit(_form)">
+        <div class="modal-header">
+            <button type="button" class="close" ng-click="$dismiss()" aria-hidden="true">&times;</button>
+            <h3 style="color:#000">Widget Settings</h3>
+        </div>
+
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="control-label col-lg-3 col-md-3">Name</label>
+                <div class="col-lg-9 col-md-9">
+                    <input name="name" type="text" ng-model="form.name" class="form-control"/>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="control-label col-lg-3 col-md-3">Patient Id</label>
+                <div class="col-lg-9 col-md-9">
+                  <select class="form-control" data-dropdownjs="true"
+									ng-model="form.patient" ng-options="p as p for p in patient_ids" ng-change="changePatient()">
+									<option value=''>-- select patient id --</option>
+									</select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="control-label col-lg-3 col-md-3">Measurement unit</label>
+                <div class="col-lg-9 col-md-9">
+                  <select class="form-control" data-dropdownjs="true"
+									ng-model="form.mnt" ng-options="mnt as mnt for mnt in mnts" ng-change="changeMeasurement()">
+									<option value=''>-- select type of measurment --</option>
+									</select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="control-label col-lg-3 col-md-3">Channel</label>
+                <div class="col-lg-9 col-md-9">
+                  <select class="form-control" data-dropdownjs="true"
+									ng-model="form.ch" ng-options="c as c for c in chs">
+									<option value=''>-- select channel --</option>
+									</select>
+                </div>
+            </div>
+                
+        </div>
+
+        <div class="modal-footer">
+            <button ng-click="$dismiss()" aria-hidden="true" class="btn btn-default"><i class="mdi-content-clear"></i>Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="mdi-action-done"></i>Save</button>
+        </div>
+    </form>
+</div>

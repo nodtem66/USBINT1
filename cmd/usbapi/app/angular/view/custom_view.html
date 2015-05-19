@@ -1,0 +1,32 @@
+<!-- control panel -->
+<div class="row">
+	<div class="col-xs-5">
+		<h2><i class="mdi-action-extension"></i> Custom View</h2>
+	</div>
+	<div class="col-xs-7" style="text-align:right;">
+		<button class="btn btn-info" ng-click="addWidget()">Add Widget</button>
+		<button class="btn btn-warning" ng-click="clear()">Clear</button>
+	</div>
+</div>
+
+<!-- gridster dynamic section -->
+<div class="row" gridster="gridsterOptions">
+<ul>
+	<li gridster-item="widget" ng-repeat="widget in dashboard.widgets">
+		<div class="panel panel-default" style="height:100%;background:#000">
+			<div class="panel-heading" ng-controller="WidgetController">
+				<div class="row">
+				<div class="col-xs-7"><b>{{ widget.name }}</b></div>
+				<div class="col-xs-5" style="text-align:right">
+					<a style="padding:4px;margin:0" class="btn btn-default btn-flat" title="setting widget" ng-click="openSettings(widget)"><i class="mdi-action-settings"></i></a>
+					<a style="padding:4px;margin:0" class="btn btn-default btn-flat" title="Remove widget" ng-click="remove(widget)"><i class="mdi-action-delete"></i></a>
+				</div>
+				</div>
+			</div>
+			<div class="panel-body" style="width:100%;height:100%" id="{{'widget_'+widget.id}}">
+
+			</div>
+		</div>
+	</li>
+</ul>
+</div>

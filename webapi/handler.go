@@ -103,7 +103,7 @@ func (h *APIHandler) GetSqliteConnection(path string) (conn *sql.DB, err error) 
 	if conn, ok = h.SqliteConn[path]; ok {
 		return
 	}
-	if conn, err = sql.Open("sqlite3", path); err != nil {
+	if conn, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rw&_busy_timeout=5000", path)); err != nil {
 		return
 	}
 	h.SqliteConn[path] = conn
