@@ -13,9 +13,9 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=jirawat
-Date                   :=05/17/15
+Date                   :=10/06/2015
 CodeLitePath           :="C:\Program Files (x86)\CodeLite"
-LinkerName             :=D:/bin/TDM-GCC-64/bin/g++.exe 
+LinkerName             :=D:/bin/TDM-GCC-64/bin/g++.exe
 SharedObjectLinkerName :=D:/bin/TDM-GCC-64/bin/g++.exe -shared -fPIC
 ObjectSuffix           :=.o
 DependSuffix           :=.o.d
@@ -36,7 +36,7 @@ ObjectsFileList        :="usbint1.txt"
 PCHCompileFlags        :=
 MakeDirCommand         :=makedir
 RcCmpOptions           := 
-RcCompilerName         :=D:/bin/TDM-GCC-64/bin/windres.exe 
+RcCompilerName         :=D:/bin/TDM-GCC-64/bin/windres.exe
 LinkOptions            :=  -lusb-1.0 -L./lib64/
 IncludePath            :=  $(IncludeSwitch). $(IncludeSwitch). 
 IncludePCH             := 
@@ -50,12 +50,12 @@ LibPath                := $(LibraryPathSwitch).
 ## AR, CXX, CC, AS, CXXFLAGS and CFLAGS can be overriden using an environment variables
 ##
 AR       := D:/bin/TDM-GCC-64/bin/ar.exe rcu
-CXX      := D:/bin/TDM-GCC-64/bin/g++.exe 
-CC       := D:/bin/TDM-GCC-64/bin/gcc.exe 
+CXX      := D:/bin/TDM-GCC-64/bin/g++.exe
+CC       := D:/bin/TDM-GCC-64/bin/gcc.exe
 CXXFLAGS :=  -O2 -Wall $(Preprocessors)
 CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
-AS       := D:/bin/TDM-GCC-64/bin/as.exe 
+AS       := D:/bin/TDM-GCC-64/bin/as.exe
 
 
 ##

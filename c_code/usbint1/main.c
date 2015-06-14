@@ -647,7 +647,8 @@ int parse_opt(int argc, char **argv)
     }
     // if length arguments is 0
     
-    printf("Missing patient ID\n");
+    printf("Missing patient ID\nUsage: %s $patient_id [$bus $address]\n", argv[0]);
+    printf("Example: %s patient1\n         %s patient2 1 4\n", argv[0], argv[0]);
     return 1;
 }
 

@@ -64,7 +64,36 @@ app.controller('DashboardController', function($scope, $rootScope, $http) {
 	this.state = 0;
 	$http.get("patient")
     .success(function(data) {$scope.names = data.result;});
-  
+  $http.get("sys/list_service")
+    .success(function(data)
+    {
+    	$scope.patient_info = {};
+    	for (var i=0, len=data.result.length; i < len; i++) 
+    	{
+    		var patient_id = data.result[i]['patient'];
+    		var bus = data.result[i]['bus'];
+    		var address = data.result[i]['address'];
+    		var pid = data.result[i]['pid'];
+    		if (patient_id.length > 0)
+    			$scope.patient_info[patient_id] = {'bus': bus, 'address': address, 'pid': pid};
+    	}
+    });
+
+  this.getActivePatientId = function() {
+  	var ret = [];
+  	if ($scope.names && $scope.patient_info) 
+  	{
+  		for (var i=0, l=$scope.names.length; i<l; i++)
+  		{
+  			var patient_id = $scope.names[i];
+  			if ($scope.patient_info[patient_id]) {
+  				ret[i] = $scope.patient_infp[patient_id];
+  			  ret[i]['patient_id'] = patient_id;
+  			}
+  		}
+  	}
+  	return ret;
+  };
   this.selectUSBPage = function() {
   	$http.get("sys/list_usb")
   	.success(function(data) {$scope.devices = data.result; that.state = 1;});
@@ -82,13 +111,25 @@ app.controller('DashboardController', function($scope, $rootScope, $http) {
   this.startNewDevice = function() {
   	var bus = this.dev_bus;
   	var addr = this.dev_addr;
-  	$http.get('sys/start', {params: {patient: $scope.pid, bus: bus, addr: addr}})
+  	$http.get('sys/start', {params: {patient: $scope.patient_id, bus: bus, addr: addr}})
   	.success(function(data){
   		that.state = 0;
-  		$.snackbar({content: "start monitor [" + $scope.pid + "] with device bus-address of [" + bus + ":" + addr + "]", timeout: 800});
+  		$.snackbar({content: "start monitor [" + $scope.patient_id + "] with device bus-address of [" + bus + ":" + addr + "]", timeout: 800});
   	});
   };
-  this.removePatient = function() {}
+  this.stopDevice = function(patient_id) {
+  	if (!$scope.patient_info[patient_id]) {
+  		$.snackbar({content: "cannot stop device with patient id `" + patient_id + "`", timeout: 800});
+  		return;
+  	}
+  	var info = $scope.patient_info[patient_id];
+  	var bus = info['bus'];
+  	var addr = info['address'];
+  	$http.get('sys/stop', {params: {'patient': patient_id, 'bus': bus, 'addr': addr}})
+  	.success(function(data){
+  		$.snackbar({content: "stop monitor [" + patient_id + "] with device bus-address of [" + bus + ":" + addr + "]", timeout: 800});
+  	});
+  };
 });
 
 app.controller('HistoryController', ['$scope', function($scope) {

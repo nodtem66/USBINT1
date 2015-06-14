@@ -154,7 +154,7 @@ func TestWebApi_Tag(t *testing.T) {
 func TestWebApi_TagId(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
-	
+
 	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(404)
 	}
@@ -407,4 +407,3 @@ func TestWindow_ListPidFromName(t *testing.T) {
 		t.Log(pids)
 	}
 }
-

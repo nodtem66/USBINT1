@@ -130,7 +130,7 @@ angular.module('WebMonitor').controller('PatientViewController', function($rootS
 		}
 		// update last time
 		$scope.params.last_time = d[0]["time"];
-		if (mnt_type != 'ecg') {
+		if (mnt_type != 'ooo') {
 			dps_min = Math.min.apply(null, dps_y);
 			dps_max = Math.max.apply(null, dps_y);
 			chart.options.axisY["minimum"] = dps_min;
@@ -160,7 +160,7 @@ angular.module('WebMonitor').controller('PatientViewController', function($rootS
 
 				if (buffer_dps.length > 0) {
 					var yy = buffer_dps.shift();
-					yy.y *= -1;
+					if (mnt_type == "oxigen_sat") yy.y *= -1;
 					$scope["dps"].push(yy);
 					dps_y.push(yy.y);
 					if ($scope["dps"].length > limit) {
@@ -183,7 +183,7 @@ angular.module('WebMonitor').controller('PatientViewController', function($rootS
 		{
 			if (buffer_dps.length > 0) {
 				var yy = buffer_dps.shift();
-				yy.y *= -1;
+				if (mnt_type == "oxigen_sat") yy.y *= -1;
 				$scope["dps"].push(yy);
 				dps_y.push(yy.y);
 				if ($scope["dps"].length > limit) {
@@ -220,20 +220,20 @@ angular.module('WebMonitor').controller('PatientViewController', function($rootS
 		if (tag["unit"])
 			chart.options["axisY"]["title"] = "Voltage (" + tag["unit"] + ")";
 		if (mnt_type == 'ecg') {
-			chart.options.axisX.interval = 200;
-			chart.options.axisX.intervalType = "millisecond";
-			chart.options.axisX.interlacedColor= "#111";
-			chart.options.axisX.gridThickness = 1;
-			chart.options.axisY.interval = 0.5;
-			chart.options.axisY.minimum = -5;
-			chart.options.axisY.maximum = 5;
-			chart.options.axisY.gridThickness = 1;
-			chart.options.axisY.gridColor = "#666";
+			//chart.options.axisX.interval = 200;
+			//chart.options.axisX.intervalType = "millisecond";
+			//chart.options.axisX.interlacedColor= "#111";
+			//chart.options.axisX.gridThickness = 1;
+			//chart.options.axisY.interval = 0.5;
+			//chart.options.axisY.minimum = -5;
+			//chart.options.axisY.maximum = 5;
+			//chart.options.axisY.gridThickness = 1;
+			//chart.options.axisY.gridColor = "#666";
 			$scope.params.rate = $scope.params.rate || 1000;
 			$scope.params.limits = 5*$scope.params.rate;
-			$scope.params.delay = 100; // milliseconds
-			$scope.params.sample_delay = $scope.params.rate * $scope.params.delay / 1000;
-			$scope.params.last_time -= 6e9;
+			$scope.params.delay = 25; // milliseconds
+			$scope.params.sample_delay = $scope.params.rate * $scope.params.delay;
+			$scope.params.last_time -= 5.1e9;
 		}
 		else if (mnt_type == 'oxigen_sat') {
 			chart.options.axisY.title = null;			

@@ -69,9 +69,10 @@ func NewAPIRouter(h *APIHandler) *httprouter.Router {
 //   servicerecord[N] is pid of service N-1
 // busrecord
 type ServiceInfo struct {
-	Pid     string
-	Bus     int
-	Address int
+	Pid       string
+	PatientId string
+	Bus       int
+	Address   int
 }
 type APIHandler struct {
 	Conf              *config.TomlConfig
@@ -549,12 +550,14 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 					h.StartedPid[rec.Pid] = false
 					h.StartedBusAddress[fmt.Sprintf("%d:%d", rec.Bus, rec.Address)] = false
 					h.ServiceRecord[i].Pid = ""
+					h.ServiceRecord[i].PatientId = ""
 					h.ServiceRecord[i].Bus = 0
 					h.ServiceRecord[i].Address = 0
 				}
 			}
 			s = map[string]string{
 				"pid":     rec.Pid,
+				"patient": rec.PatientId,
 				"bus":     fmt.Sprintf("%d", rec.Bus),
 				"address": fmt.Sprintf("%d", rec.Address),
 			}
@@ -650,7 +653,7 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 					go func() {
 						//start usb service i+1
 						var err error
-						if err = StopUsbIntService(i+1); err != nil {
+						if err = StopUsbIntService(i + 1); err != nil {
 							log.Print(err)
 						}
 						if err = StartUsbIntService(i+1, patient, bus, addr); err != nil {
@@ -667,6 +670,7 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 							// check if not exists pid
 							if val := h.StartedPid[pid]; val == false {
 								h.ServiceRecord[i].Pid = pid
+								h.ServiceRecord[i].PatientId = patient
 								h.ServiceRecord[i].Bus = bus
 								h.ServiceRecord[i].Address = addr
 								h.StartedPid[pid] = true
@@ -720,6 +724,7 @@ func (h *APIHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request, ps 
 						h.StartedPid[s.Pid] = false
 						h.StartedBusAddress[fmt.Sprintf("%d:%d", bus, addr)] = false
 						h.ServiceRecord[i].Pid = ""
+						h.ServiceRecord[i].PatientId = ""
 						h.ServiceRecord[i].Bus = 0
 						h.ServiceRecord[i].Address = 0
 
