@@ -15,7 +15,7 @@ nssm.exe set usbint1_%%i AppRotateBytes 1048576
 echo.
 )
 nssm.exe install usbshad %DIR%\usbshad.exe
-nssm.exe set usbshade Start SERVICE_DEMAND_START
+nssm.exe set usbshad Start SERVICE_DEMAND_START
 
 nssm.exe install usbsync %DIR%\usbsync.exe
 nssm.exe set usbsync Start SERVICE_DEMAND_START

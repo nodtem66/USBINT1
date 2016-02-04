@@ -188,7 +188,7 @@ int main(int argc, char **argv)
 	#endif
         
     scan_devices();
-    if (dev_handle == NULL) {printf("No device"); goto exit_main;}
+    if (dev_handle == NULL) {printf("No device\n"); goto exit_main;}
     
     
      // Delete old test.db
@@ -641,12 +641,11 @@ int parse_opt(int argc, char **argv)
         if (len_patient > 0) {
             strncpy(patientID, argv[optind], len_patient);
             sprintf(db_filename, "%s.db", patientID);
-            sprintf(sqlite_path, "file:%s.db?mode=rwc&cache=shared", patientID);
+            sprintf(sqlite_path, "file:%s.db?mode=rwc", patientID);
             return 0;
         }
     }
     // if length arguments is 0
-    
     printf("Missing patient ID\nUsage: %s $patient_id [$bus $address]\n", argv[0]);
     printf("Example: %s patient1\n         %s patient2 1 4\n", argv[0], argv[0]);
     return 1;
