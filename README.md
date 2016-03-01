@@ -10,6 +10,8 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
   For Windows, [Zadig](http://zadig.akeo.ie/) is recommended for install libusb-based driver
   
 ## Directory
+* `c_code`:
+  native-C source code of `usbint`. use for optimization speed.
 * `cmd`:
   command line programs to run daemon
 * `test`: 
@@ -29,6 +31,7 @@ USB Host Firmware in #golang for Silab C8051F380 [USBINT1-C8051F380](https://git
 ## Commands in `cmd`
 * `usbint`:
    command line program to run daemon with target vid, pid, and patient id
+   note: now use only `usbint` in `c_code`
 * `usbtest`:
    command line to test `kylelemons/gousb`
 * `usbapi`:
