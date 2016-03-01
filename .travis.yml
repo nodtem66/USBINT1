@@ -26,7 +26,7 @@ install:
 
 script:
   - go test -v github.com/nodtem66/usbint1/config
-  - go test -v github.com/nodtem66/usbint1/webapi
+  - go test -v -run ^WebApi github.com/nodtem66/usbint1/webapi
   - go test -v github.com/nodtem66/usbint1/firmware
   - go test -v github.com/nodtem66/usbint1/db
   - go test -v github.com/nodtem66/usbint1/shading

@@ -39,10 +39,6 @@ func TestWebApi_Index(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
 
-	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(404)
-	}
-
 	r, _ := http.NewRequest("GET", "/version", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -102,10 +98,6 @@ func TestWebApi_Tag(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
 
-	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(404)
-	}
-
 	r, _ := http.NewRequest("GET", "/patient/test22/tag", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -155,10 +147,6 @@ func TestWebApi_TagId(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
 
-	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(404)
-	}
-
 	r, _ := http.NewRequest("GET", "/patient/test/tag/1", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -192,9 +180,6 @@ func TestWebApi_Measurement(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
 
-	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(404)
-	}
 	r, _ := http.NewRequest("GET", "/patient/test/mnt", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -286,9 +271,6 @@ func TestWebApi_MeasurementQuery(t *testing.T) {
 	globalHandler.Conf = &conf
 	router := NewAPIRouter(globalHandler)
 
-	router.NotFound = func(rw http.ResponseWriter, r *http.Request) {
-		rw.WriteHeader(404)
-	}
 	r, _ := http.NewRequest("GET", "/patient/test/mnt/general_1?limit=10", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)

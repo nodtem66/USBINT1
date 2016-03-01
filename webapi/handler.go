@@ -53,7 +53,7 @@ func NewAPIRouter(h *APIHandler) *httprouter.Router {
 	router.GET("/patient/:patientId/mnt", h.GetMeasurements)
 	router.GET("/patient/:patientId/mnt/:mntId", h.GetMeasurement)
 	router.GET("/sys/:option", h.GetSystemStatus)
-	router.NotFound = http.FileServer(http.Dir("app/")).ServeHTTP
+	router.NotFound = http.FileServer(http.Dir("app/"))
 	return router
 }
 
